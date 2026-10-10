@@ -7,6 +7,7 @@
 
 #include <fcitx-utils/event.h>
 #include <fcitx-utils/log.h>
+#include <fcitx-utils/standardpath.h>
 #include <fcitx/addonfactory.h>
 #include <fcitx/addonmanager.h>
 #include <fcitx/candidatelist.h>
@@ -55,13 +56,17 @@ public:
     explicit VanguardEngine(fcitx::Instance *instance) : instance_(instance) {
         const char *fromEnv = std::getenv("FCITX5_VANGUARD_TEXTMAP");
         const std::string textMap = (fromEnv && *fromEnv) ? fromEnv : VANGUARD_DEFAULT_TEXTMAP;
-        const int32_t rc = vg_init(textMap.c_str(), this, &VanguardEngine::onCommit, &VanguardEngine::onUpdate);
+        // 使用者語彙與選字記憶放在 fcitx5 的使用者資料目錄底下（通常是 ~/.local/share/fcitx5/vanguard）。
+        const std::string userData =
+            fcitx::StandardPath::global().userDirectory(fcitx::StandardPath::Type::PkgData) + "/vanguard";
+        const int32_t rc =
+            vg_init(textMap.c_str(), userData.c_str(), this, &VanguardEngine::onCommit, &VanguardEngine::onUpdate);
         if (rc != 0) {
-            VANGUARD_ERROR() << "vg_init failed, rc=" << rc << ", textmap=" << textMap;
+            VANGUARD_ERROR() << "vg_init failed, rc=" << rc << ", textmap=" << textMap << ", userdata=" << userData;
             return;
         }
         ready_ = true;
-        VANGUARD_INFO() << "engine loaded, textmap=" << textMap;
+        VANGUARD_INFO() << "engine started, textmap=" << textMap << ", userdata=" << userData;
         pump();
 
         // 引擎有工作排在 libdispatch 主佇列上，而 fcitx5 不跑 dispatch 主迴圈。
@@ -74,6 +79,14 @@ public:
                 timer->setOneShot();
                 return true;
             });
+    }
+
+    ~VanguardEngine() override {
+        if (!ready_) return;
+        pumpTimer_.reset();
+        // 把選字記憶與偏好設定寫回磁碟。
+        vg_shutdown();
+        vg_pump();
     }
 
     void activate(const fcitx::InputMethodEntry &, fcitx::InputContextEvent &event) override {
@@ -138,6 +151,18 @@ private:
 
     void pump() {
         vg_pump();
+        if (!lexiconReported_) {
+            // 辭庫是非同步載入的，好了（或失敗）之後記一筆，方便從紀錄看出啟動花了多久。
+            const int32_t state = vg_lexicon_state();
+            if (state != 0) {
+                lexiconReported_ = true;
+                if (state > 0) {
+                    VANGUARD_INFO() << "lexicon loaded";
+                } else {
+                    VANGUARD_ERROR() << "lexicon failed to load";
+                }
+            }
+        }
         if (!dirty_) return;
         dirty_ = false;
         if (auto *inputContext = inputContext_.get()) updateUI(inputContext);
@@ -183,6 +208,7 @@ private:
     fcitx::Instance *instance_;
     bool ready_ = false;
     bool dirty_ = false;
+    bool lexiconReported_ = false;
     // 引擎目前在服務的輸入情境。第一版所有情境共用一個引擎 session。
     fcitx::TrackableObjectReference<fcitx::InputContext> inputContext_;
     std::unique_ptr<fcitx::EventSourceTime> pumpTimer_;

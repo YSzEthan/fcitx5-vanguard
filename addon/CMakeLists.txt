@@ -8,10 +8,15 @@ find_package(Fcitx5Core 5.1 REQUIRED)
 include(GNUInstallDirs)
 
 # 引擎的 C 匯出層（Swift 動態庫）先用 `swift build` 編好，這裡只連結它。
-set(VANGUARD_ENGINE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../engine/.build/debug"
+set(VANGUARD_ENGINE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../engine/.build/release"
     CACHE PATH "含有 libVGEngine.so 與 libVanguard.so 的目錄")
 set(VANGUARD_DEFAULT_TEXTMAP "${CMAKE_INSTALL_FULL_DATADIR}/fcitx5-vanguard/vanguardTextMap.txtMap"
     CACHE FILEPATH "環境變數 FCITX5_VANGUARD_TEXTMAP 沒設時使用的辭庫路徑")
+
+# 原廠辭庫：用 vChewing-VanguardLexicon 的 `swift run VCDataBuilder vanguardTextMap` 編出來的檔案。
+set(VANGUARD_LEXICON_FILE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../vendor/vChewing-VanguardLexicon/Build/Release/vanguard-textmap/VanguardFactoryDict4Typing.txtMap"
+    CACHE FILEPATH "要安裝的原廠辭庫檔")
 
 add_library(VGEngine SHARED IMPORTED)
 set_target_properties(VGEngine PROPERTIES
@@ -34,3 +39,11 @@ install(FILES data/vanguard-addon.conf RENAME vanguard.conf
         DESTINATION "${CMAKE_INSTALL_DATADIR}/fcitx5/addon")
 install(FILES data/vanguard-im.conf RENAME vanguard.conf
         DESTINATION "${CMAKE_INSTALL_DATADIR}/fcitx5/inputmethod")
+
+if(EXISTS "${VANGUARD_LEXICON_FILE}")
+  cmake_path(GET VANGUARD_DEFAULT_TEXTMAP PARENT_PATH lexicon_dir)
+  cmake_path(GET VANGUARD_DEFAULT_TEXTMAP FILENAME lexicon_name)
+  install(FILES "${VANGUARD_LEXICON_FILE}" DESTINATION "${lexicon_dir}" RENAME "${lexicon_name}")
+else()
+  message(WARNING "找不到原廠辭庫 ${VANGUARD_LEXICON_FILE}，不會安裝辭庫。")
+endif()

@@ -8,7 +8,7 @@ set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-(cd engine && swift build 2>&1 | tail -1)
+(cd engine && swift build -c release 2>&1 | tail -1)
 PREFIX="$ROOT/addon/prefix"
 cmake -S addon -B addon/build -G Ninja -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_BUILD_TYPE=RelWithDebInfo >/dev/null
 cmake --build addon/build 2>&1 | tail -1
@@ -20,7 +20,24 @@ mkdir -p "$SANDBOX/home/.config/fcitx5" "$SANDBOX/run"
 chmod 700 "$SANDBOX/run"
 cp tests/profile "$SANDBOX/home/.config/fcitx5/profile"
 
-exec env -i \
+LEXICON="$PREFIX/share/fcitx5-vanguard/vanguardTextMap.txtMap"
+
+echo "##### 偏好設定：不經 fcitx5，兩個行程 #####"
+PREFS="$ROOT/addon/build/prefs"
+rm -rf "$PREFS" && mkdir -p "$PREFS"
+cc -O1 -g -Wall -Iengine/include -o addon/build/prefs_host tests/prefs_host.c \
+  engine/.build/release/libVGEngine.so -Wl,-rpath,"$ROOT/engine/.build/release"
+STATUS=0
+for mode in set check; do
+  echo "--- $mode"
+  env -i PATH=/usr/bin:/bin LANG=C.UTF-8 HOME="$PREFS" XDG_CONFIG_HOME="$PREFS/.config" \
+    ./addon/build/prefs_host - "$LEXICON" "$PREFS/userdata" "$mode" >"$PREFS/$mode.log" 2>&1 || STATUS=1
+  grep -v vChewingDebug "$PREFS/$mode.log" || true
+done
+echo "    偏好設定檔：$(cd "$PREFS" && find . -name '*.plist')"
+
+echo "##### 打字：真的 fcitx5 行程，經 DBus #####"
+env -i \
   PATH=/usr/bin:/bin \
   LANG=C.UTF-8 \
   HOME="$SANDBOX/home" \
@@ -30,6 +47,6 @@ exec env -i \
   XDG_RUNTIME_DIR="$SANDBOX/run" \
   XDG_DATA_DIRS="$PREFIX/share:/usr/share" \
   FCITX_ADDON_DIRS="$PREFIX/lib/fcitx5:/usr/lib/x86_64-linux-gnu/fcitx5" \
-  FCITX5_VANGUARD_TEXTMAP="$ROOT/vendor/vChewing-LibVanguard/Sources/LXAssemblyMaterials4Tests/Resources/vanguardTextMap_test.txtMap" \
   FCITX5_LOG="$SANDBOX/fcitx5.log" \
-  dbus-run-session -- python3 "$ROOT/tests/dbus_typing_test.py" "$@"
+  dbus-run-session -- python3 "$ROOT/tests/dbus_typing_test.py" "$@" || STATUS=1
+exit $STATUS

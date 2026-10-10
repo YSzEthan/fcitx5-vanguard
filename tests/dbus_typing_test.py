@@ -19,7 +19,9 @@ CAP_CLIENT_SIDE_INPUT_PANEL = 1 << 39
 
 KEY_RETURN = 0xFF0D
 KEY_ESCAPE = 0xFF1B
+KEY_LEFT = 0xFF51
 KEY_DOWN = 0xFF54
+STATE_SHIFT = 1 << 0
 STATE_NUM_LOCK = 1 << 4
 
 
@@ -95,120 +97,203 @@ def wait_for_name(bus, name, timeout=10.0):
     return False
 
 
+def start_fcitx5(bus, log_path):
+    log = open(log_path, "a")
+    process = subprocess.Popen(
+        ["fcitx5", "--disable=all", "--enable=dbus,dbusfrontend,keyboard,vanguard", "--verbose=vanguard=5"],
+        stdout=log,
+        stderr=subprocess.STDOUT,
+    )
+    if not wait_for_name(bus, SERVICE):
+        raise RuntimeError("fcitx5 沒有在私有 DBus 上註冊")
+    client = Client(bus)
+    controller = dbus.Interface(bus.get_object(SERVICE, "/controller"), "org.fcitx.Fcitx.Controller1")
+    controller.Activate()
+    controller.SetCurrentIM("vanguard")
+    client.settle(0.3)
+    return process, client, controller
+
+
+def stop_fcitx5(process):
+    process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+    time.sleep(0.3)  # 等名稱從 bus 上消失
+    return process.returncode
+
+
+def wait_for_lexicon(client, timeout=30.0):
+    """辭庫是非同步載入的。載入前引擎會擋下按鍵，所以一直試到注音出現為止。"""
+    start = time.monotonic()
+    while time.monotonic() - start < timeout:
+        client.key(ord("s"))
+        if client.preedit == "ㄋ":
+            client.key(KEY_ESCAPE)
+            return time.monotonic() - start
+        client.settle(0.1)
+    return None
+
+
+def candidate_texts(client):
+    return [text for _label, text in client.candidates]
+
+
 def main():
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus()
     log_path = os.environ["FCITX5_LOG"]
+    user_data = os.path.join(os.environ["XDG_DATA_HOME"], "fcitx5", "vanguard")
     report = Report()
+    open(log_path, "w").close()
 
-    with open(log_path, "w") as log:
-        fcitx5 = subprocess.Popen(
-            ["fcitx5", "--disable=all", "--enable=dbus,dbusfrontend,keyboard,vanguard", "--verbose=vanguard=5"],
-            stdout=log,
-            stderr=subprocess.STDOUT,
-        )
+    print("=== 第一次啟動 ===")
+    fcitx5, client, controller = start_fcitx5(bus, log_path)
     try:
-        print("1. 啟動 fcitx5 並切到 vanguard")
-        report.check("fcitx5 在私有 DBus 上註冊", wait_for_name(bus, SERVICE))
-        client = Client(bus)
-        controller = dbus.Interface(bus.get_object(SERVICE, "/controller"), "org.fcitx.Fcitx.Controller1")
-        controller.Activate()
-        controller.SetCurrentIM("vanguard")
-        client.settle(0.3)
+        print("1. 啟動、切到 vanguard、等完整辭庫載入")
         report.equal("目前輸入法", str(controller.CurrentInputMethod()), "vanguard")
+        waited = wait_for_lexicon(client)
+        report.check("辭庫載入完成、可以打字", waited is not None, f"等了 {waited:.2f} 秒" if waited is not None else "逾時")
 
-        print("2. 打「ㄋㄧㄢˊ ㄓㄨㄥ」（su06 5j/ 空白）")
-        handled = client.type("su065j/ ")
+        print("2. 打「ㄋㄧˇ ㄏㄠˇ」（su3 cl3）——測試辭庫沒有、完整辭庫才有的詞")
+        handled = client.type("su3cl3")
         report.check("每個鍵都被引擎攔下", all(handled), str(handled))
-        report.equal("客體收到的組字區", client.preedit, "年終")
-        report.equal("還沒有送字", client.commits, [])
-
-        print("3. 按 ↓ 叫出候選字")
-        client.key(KEY_DOWN)
-        print(f"    候選字：{client.candidates}，反白第 {client.candidate_cursor} 個")
-        report.equal("前兩個候選字", [text for _label, text in client.candidates[:2]], ["年終", "年中"])
-        report.equal("選字鍵標籤", [label for label, _text in client.candidates[:2]], ["1. ", "2. "])
-
-        print("4. 按 2 選「年中」")
-        client.key(ord("2"))
-        report.equal("組字區變成", client.preedit, "年中")
-        report.equal("候選字收起來", client.candidates, [])
-
-        print("5. 按 Enter 送字")
+        report.equal("組字區", client.preedit, "你好")
         client.key(KEY_RETURN)
-        report.equal("客體收到的送字", client.commits, ["年中"])
-        report.equal("組字區清空", client.preedit, "")
+        report.equal("送字", client.commits, ["你好"])
 
-        print("6. 組字區是空的時候，Enter 要放行給應用程式")
+        print("3. 同音詞選字：打「ㄋㄧㄢˊ ㄓㄨㄥ」，按 ↓，選不是首選的那個")
+        client.type("su065j/ ")
+        first_choice = client.preedit
+        client.key(KEY_DOWN)
+        texts = candidate_texts(client)
+        print(f"    首選 {first_choice!r}，候選字 {texts[:6]}")
+        report.check("年終與年中都在候選字裡", "年終" in texts and "年中" in texts)
+        chosen = "年中" if first_choice == "年終" else "年終"
+        label = client.candidates[texts.index(chosen)][0] if chosen in texts else "1. "
+        report.check("選字鍵標籤是數字", label[:1].isdigit(), repr(label))
+        client.key(ord(label[0]))
+        report.equal("按選字鍵之後組字區", client.preedit, chosen)
+        report.equal("候選字收起來", client.candidates, [])
+        client.key(KEY_RETURN)
+        report.equal("累計送字", client.commits, ["你好", chosen])
+
+        print("4. 組字區是空的時候，Enter 要放行給應用程式")
         report.equal("Enter 是否被攔下", client.key(KEY_RETURN), False)
 
-        print("7. 開著 Num Lock 打字（一般桌面的常態）")
-        client.type("284", STATE_NUM_LOCK)
-        report.equal("組字區", client.preedit, "大")
-        client.type("gj4", STATE_NUM_LOCK)
+        print("5. 開著 Num Lock 打字（一般桌面的常態）")
+        client.type("284gj4", STATE_NUM_LOCK)
         report.equal("組字區", client.preedit, "大樹")
         client.key(KEY_RETURN, STATE_NUM_LOCK)
-        report.equal("累計送字", client.commits, ["年中", "大樹"])
+        report.equal("累計送字", client.commits, ["你好", chosen, "大樹"])
 
-        print("8. 打到一半按 Esc")
+        print("6. 打到一半按 Esc")
         client.type("su0")
         report.equal("組字區", client.preedit, "ㄋㄧㄢ")
         client.key(KEY_ESCAPE)
         report.equal("Esc 之後組字區", client.preedit, "")
 
-        print("9. 打到一半焦點離開，組字區的字要送出去，而且只送一次")
+        print("7. 打到一半焦點離開，組字區的字要送出去，而且只送一次")
         client.type("284")
         report.equal("組字區", client.preedit, "大")
         client.ic.FocusOut()
         client.settle(0.3)
-        report.equal("累計送字", client.commits, ["年中", "大樹", "大"])
+        report.equal("累計送字", client.commits, ["你好", chosen, "大樹", "大"])
         client.ic.FocusIn()
         client.settle(0.2)
         client.type("28")
         report.equal("回到焦點後組字區從頭開始", client.preedit, "ㄉㄚ")
         client.key(KEY_ESCAPE)
 
-        print("10. 用滑鼠點選候選字（客體呼叫 SelectCandidate）")
-        client.type("su065j/ ")
-        before = client.preedit
+        print("8. 用滑鼠點選候選字（客體呼叫 SelectCandidate）")
+        client.type("284gj4")
         client.key(KEY_DOWN)
-        texts = [text for _label, text in client.candidates]
-        # 第 4 步選過「年中」，引擎會記住使用者的選擇，所以這裡的首選與順序可能跟第 3 步不同。
-        print(f"    組字區 {before!r}，候選字 {texts}")
-        target = "年終" if before == "年中" else "年中"
-        report.check("另一個同音詞在候選字裡", target in texts)
-        client.ic.SelectCandidate(texts.index(target) if target in texts else 0)
+        texts = candidate_texts(client)
+        print(f"    候選字 {texts[:6]}（共 {len(texts)} 個）")
+        report.check("有兩個以上的候選字", len(texts) >= 2)
+        clicked = texts[1] if len(texts) >= 2 else ""
+        client.ic.SelectCandidate(1)
         client.settle()
-        report.equal("點選之後組字區", client.preedit, target)
+        report.check("點選的字進了組字區", clicked != "" and clicked in client.preedit, f"點了 {clicked!r}，組字區 {client.preedit!r}")
         report.equal("候選字收起來", client.candidates, [])
 
-        print("11. 打到一半切換輸入法，組字區的字要送出去，而且只送一次")
+        print("9. 打到一半切換輸入法，組字區的字要送出去，而且只送一次")
+        pending = client.preedit
         controller.SetCurrentIM("keyboard-us")
         client.settle(0.3)
-        report.equal("累計送字", client.commits, ["年中", "大樹", "大", target])
+        report.equal("累計送字", client.commits, ["你好", chosen, "大樹", "大", pending])
         controller.SetCurrentIM("vanguard")
         client.settle(0.3)
         report.equal("切回來", str(controller.CurrentInputMethod()), "vanguard")
 
-        print("12. 閒置 1 秒後 fcitx5 仍然正常")
+        print("10. 加入使用者語彙：打兩個不成詞的字，Shift+← 兩次選取，按 Enter")
+        # 完整辭庫裡什麼詞都可能有，所以多準備幾組，用第一組「還不是詞」的。
+        attempts = [("5j/ gj4", "ㄓㄨㄥ-ㄕㄨˋ"), ("gj4284", "ㄕㄨˋ-ㄉㄚˋ"), ("gj4su06", "ㄕㄨˋ-ㄋㄧㄢˊ")]
+        phrase, phrase_keys, reading, before = "", "", "", []
+        for phrase_keys, reading in attempts:
+            client.type(phrase_keys)
+            phrase = client.preedit
+            client.key(KEY_DOWN)
+            before = candidate_texts(client)
+            client.key(KEY_ESCAPE)
+            if phrase not in before:
+                break
+            client.key(KEY_ESCAPE)
+        print(f"    讀音 {reading}，組字區 {phrase!r}，加入前的候選字 {before[:6]}")
+        report.check("加入前，這兩個字不是一個詞", phrase not in before)
+        client.key(KEY_LEFT, STATE_SHIFT)
+        client.key(KEY_LEFT, STATE_SHIFT)
+        client.key(KEY_RETURN)
+        client.settle(0.6)
+        phrases_path = os.path.join(user_data, "userdata-cht.txt")
+        with open(phrases_path) as phrases_file:
+            lines = [line.strip() for line in phrases_file if line.strip()]
+        print(f"    {phrases_path} 的內容：{lines}")
+        report.check("語彙檔多了一行", any(line.startswith(f"{phrase} {reading}") for line in lines))
+        client.key(KEY_DOWN)
+        after = candidate_texts(client)
+        print(f"    加入後的候選字 {after[:6]}")
+        report.check("加入後，候選字裡有這個詞", phrase in after)
+        client.key(KEY_ESCAPE)
+        client.key(KEY_ESCAPE)
+
+        print("11. 閒置 1 秒後 fcitx5 仍然正常")
         client.settle(1.0)
         report.check("fcitx5 行程還活著", fcitx5.poll() is None)
-        client.type("284")
-        report.equal("閒置後還能打字，組字區", client.preedit, "大")
-        client.key(KEY_ESCAPE)
     finally:
-        fcitx5.terminate()
-        try:
-            fcitx5.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            fcitx5.kill()
-        print(f"    fcitx5 結束碼 {fcitx5.returncode}")
+        print(f"    fcitx5 結束碼 {stop_fcitx5(fcitx5)}")
+
+    print("=== 重新啟動 fcitx5（同一個家目錄）===")
+    fcitx5, client, controller = start_fcitx5(bus, log_path)
+    try:
+        waited = wait_for_lexicon(client)
+        report.check("辭庫載入完成", waited is not None, f"等了 {waited:.2f} 秒" if waited is not None else "逾時")
+
+        print("12. 選字記憶還在：第 3 步選過的詞變成首選")
+        client.type("su065j/ ")
+        report.equal("組字區", client.preedit, chosen)
+        client.key(KEY_ESCAPE)
+
+        print("13. 使用者語彙還在")
+        client.type(phrase_keys)
+        client.key(KEY_DOWN)
+        report.check("候選字裡有第 10 步加的詞", phrase in candidate_texts(client), f"{candidate_texts(client)[:6]}")
+        client.key(KEY_ESCAPE)
+        client.key(KEY_ESCAPE)
+
+        print("14. 偏好設定與使用者資料落地的位置")
+        prefs_path = os.path.join(os.environ["XDG_CONFIG_HOME"], "fcitx5.plist")
+        report.check("偏好設定檔存在", os.path.exists(prefs_path), prefs_path)
+        print(f"    使用者資料夾 {user_data}：{sorted(os.listdir(user_data))}")
+    finally:
+        print(f"    fcitx5 結束碼 {stop_fcitx5(fcitx5)}")
 
     print("--- fcitx5 紀錄裡跟 vanguard 有關的行：")
     with open(log_path) as log:
         for line in log:
-            if "anguard" in line or "rror" in line:
-                print("    " + line.rstrip())
+            if ("vanguard.cpp" in line and "commit" not in line and "activate" not in line) or "rror" in line:
+                print("    " + line.rstrip()[:200])
     print(f"結果：{'FAIL' if report.failed else 'PASS'}（{report.total} 項檢查，{report.failed} 項失敗）")
     return 1 if report.failed else 0
 

@@ -10,6 +10,7 @@ final class Engine {
   let proxy = ClientProxy()
   let ui = SessionUI()
   var session: InputSession?
+  var factoryLoadFailed = false
 
   static var shared: Engine?
 }
@@ -31,17 +32,19 @@ nonisolated func duplicate(_ string: String) -> UnsafeMutablePointer<CChar>? {
 @_cdecl("vg_init")
 nonisolated public func vgInit(
   _ textMapPath: UnsafePointer<CChar>,
+  _ userDataFolder: UnsafePointer<CChar>,
   _ context: UnsafeMutableRawPointer?,
   _ onCommit: @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>) -> (),
   _ onUpdate: @convention(c) (UnsafeMutableRawPointer?) -> ()
 )
   -> Int32 {
   let path = String(cString: textMapPath)
+  let folder = URL(fileURLWithPath: String(cString: userDataFolder), isDirectory: true)
   let host = HostCallbacks(context: context, onCommit: onCommit, onUpdate: onUpdate)
   return mainSync {
     guard Engine.shared == nil else { return 3 }
-    guard let textMap = try? String(contentsOfFile: path, encoding: .utf8) else { return 1 }
-    guard LXAssembly.LXFacade.connectToTestFactoryDictionary(textMapData: textMap) else { return 2 }
+    guard FileManager.default.isReadableFile(atPath: path) else { return 1 }
+    guard UserData.wireUp(folder: folder) else { return 2 }
 
     let engine = Engine()
     engine.proxy.onCommit = { host.commit($0) }
@@ -49,16 +52,46 @@ nonisolated public func vgInit(
     engine.ui.candidateController.onUpdate = { host.update() }
 
     let proxyAddr = UInt(bitPattern: Unmanaged.passUnretained(engine.proxy).toOpaque())
-    SessionHost.shared.isCoreDBConnected = { true }
     // 預設是 { _ in false }，不改的話 session.clientProxy 永遠是 nil。
     SessionHost.shared.isControllerAddressAlive = { $0 == proxyAddr }
     SessionHost.shared.ui = { engine.ui }
     SessionHost.shared.postEventForClosingAllPanels = { engine.ui.candidateController.visible = false }
 
-    PrefMgr.sharedSansDidSetOps.mostRecentInputMode = Shared.InputMode.imeModeCHT.rawValue
+    // 原廠辭庫走引擎的正式載入路徑：背景佇列讀檔，回到主佇列掛上。
+    // 所以這個函式返回時辭庫還沒好，要等宿主 pump 過；期間按鍵會被引擎擋下並提示辭庫未載入。
+    LXAssembly.LXFacade.connectFactoryDictionary(textMapPath: path) { loaded in
+      asyncOnMain {
+        Engine.shared?.factoryLoadFailed = !loaded
+        host.update()
+      }
+    }
+
+    if Shared.InputMode(rawValue: PrefMgr.sharedSansDidSetOps.mostRecentInputMode) ?? .imeModeNULL == .imeModeNULL {
+      PrefMgr.sharedSansDidSetOps.mostRecentInputMode = Shared.InputMode.imeModeCHT.rawValue
+    }
+    UserData.load()
     engine.session = InputSession(preallocated: (), manuallyAssignedClientProxy: engine.proxy)
     Engine.shared = engine
     return 0
+  }
+}
+
+/// 原廠辭庫的狀態：0 還在載入、1 已可用、-1 載入失敗。
+@_cdecl("vg_lexicon_state")
+nonisolated public func vgLexiconState() -> Int32 {
+  mainSync {
+    if LXAssembly.LXFacade.isFactoryDictionaryLoaded { return 1 }
+    return (Engine.shared?.factoryLoadFailed ?? false) ? -1 : 0
+  }
+}
+
+/// 宿主要結束前呼叫：把選字記憶與偏好設定寫回磁碟。
+@_cdecl("vg_shutdown")
+nonisolated public func vgShutdown() {
+  mainSync {
+    guard Engine.shared != nil else { return }
+    UserData.savePOM()
+    UserDefaults.standard.synchronize()
   }
 }
 
@@ -189,4 +222,55 @@ nonisolated public func vgCandidateSelect(_ index: Int32) {
 @_cdecl("vg_free")
 nonisolated public func vgFree(_ string: UnsafeMutablePointer<CChar>?) {
   free(string)
+}
+
+// MARK: - 偏好設定
+
+/// 讀一項偏好設定，轉成字串（布林值是 "true"／"false"）。key 是上游 `UserDef` 的名稱。
+/// 不認得的 key 回傳 NULL。回傳值要用 vg_free() 釋放。
+@_cdecl("vg_pref_get")
+nonisolated public func vgPrefGet(_ key: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>? {
+  let key = String(cString: key)
+  let text: String? = mainSync {
+    guard UserDef(rawValue: key) != nil, let value = UserDefaults.standard.object(forKey: key) else { return nil }
+    return switch value {
+    case let value as Bool: value ? "true" : "false"
+    case let value as String: value
+    default: "\(value)"
+    }
+  }
+  return text.flatMap(duplicate)
+}
+
+/// 寫一項偏好設定並立刻存檔。value 會依照這一項目前的型別解讀。
+/// 回傳 0 成功；1 不認得的 key；2 value 的格式跟這一項的型別不合。
+@_cdecl("vg_pref_set")
+nonisolated public func vgPrefSet(_ key: UnsafePointer<CChar>, _ value: UnsafePointer<CChar>) -> Int32 {
+  let key = String(cString: key)
+  let text = String(cString: value)
+  return mainSync {
+    let defaults = UserDefaults.standard
+    guard UserDef(rawValue: key) != nil, let current = defaults.object(forKey: key) else { return 1 }
+    switch current {
+    case is Bool:
+      guard let parsed = Bool(text) else { return 2 }
+      defaults.set(parsed, forKey: key)
+    case is Int:
+      guard let parsed = Int(text) else { return 2 }
+      defaults.set(parsed, forKey: key)
+    case is Double:
+      guard let parsed = Double(text) else { return 2 }
+      defaults.set(parsed, forKey: key)
+    case is String:
+      defaults.set(text, forKey: key)
+    default:
+      return 2
+    }
+    defaults.synchronize()
+    // 讓語言模型與鍵盤排列跟上新的設定，並丟掉打到一半的內容。
+    SessionHost.shared.syncLMPrefs()
+    Engine.shared?.session?.switchState(.ofAbortion())
+    Engine.shared?.session?.inputHandler?.ensureKeyboardParser()
+    return 0
+  }
 }
