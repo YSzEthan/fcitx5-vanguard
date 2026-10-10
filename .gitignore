@@ -1,0 +1,5 @@
+.container-home/
+vendor/
+.build/
+build/
+logs/
