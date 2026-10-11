@@ -26,6 +26,10 @@ int32_t vg_init(const char *textmap_path, const char *user_data_dir, void *conte
 // 原廠辭庫的狀態：0 還在載入、1 已可用、-1 載入失敗。
 int32_t vg_lexicon_state(void);
 
+// 注音變體選字符的資料表（跟辭庫同目錄的 phonic_table_Z.txt）有沒有載入：1 有、0 沒有。
+// 沒有時只是該項輸出功能退回不轉換，不影響打字。
+int32_t vg_bpmfvs_table_loaded(void);
+
 // 宿主結束前呼叫：把選字記憶與偏好設定寫回磁碟。
 void vg_shutdown(void);
 

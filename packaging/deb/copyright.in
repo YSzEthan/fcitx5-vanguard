@@ -1,0 +1,21 @@
+fcitx5-vanguard 由幾個授權不同的部分組成，各部分的授權全文裝在 @LICENSES@ ：
+
+LibVanguard 引擎（libVanguard.so）
+  來源：https://github.com/vChewing/vChewing-LibVanguard
+  授權：LGPL-3.0-or-later，各模組另有例外條款；部分檔案為 MulanPSL-2.0。
+  全文：@LICENSES@/LibVanguard/
+
+原廠辭庫（vanguardTextMap.txtMap）
+  來源：https://github.com/vChewing/vChewing-VanguardLexicon
+  授權：MulanPSL-2.0
+  全文：@LICENSES@/VanguardLexicon/
+
+Swift 執行期函式庫（libswift*.so、libFoundation*.so、libdispatch.so 等）
+  來源：https://www.swift.org
+  授權：Apache-2.0 WITH Swift-exception
+  全文：@LICENSES@/swift/LICENSE.txt
+
+fcitx5 外掛本體（vanguard.so）與 C 介面層（libVGEngine.so）
+  本專案自己的程式碼。授權尚未決定，決定前請勿散布這個套件。
+
+各二進位檔對應的原始碼版本記在 @LICENSES@/SOURCES.txt 。

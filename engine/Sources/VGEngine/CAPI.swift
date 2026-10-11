@@ -46,6 +46,13 @@ nonisolated public func vgInit(
     guard FileManager.default.isReadableFile(atPath: path) else { return 1 }
     guard UserData.wireUp(folder: folder) else { return 2 }
 
+    // 注音變體選字符的資料表跟辭庫裝在同一個目錄。引擎預設是從宿主執行檔旁邊找，
+    // 在 fcitx5 裡那是 /usr/bin，找不到；所以這裡明確指定。沒有這個檔時引擎會原樣輸出、不轉換。
+    let table = URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent("phonic_table_Z.txt")
+    if FileManager.default.isReadableFile(atPath: table.path) {
+      ResourceProvision.specifyBPMFVSTable(table)
+    }
+
     let engine = Engine()
     engine.proxy.onCommit = { host.commit($0) }
     engine.proxy.onUpdate = { host.update() }
@@ -83,6 +90,12 @@ nonisolated public func vgLexiconState() -> Int32 {
     if LXAssembly.LXFacade.isFactoryDictionaryLoaded { return 1 }
     return (Engine.shared?.factoryLoadFailed ?? false) ? -1 : 0
   }
+}
+
+/// 注音變體選字符的資料表有沒有載入：1 有、0 沒有（功能會退回不轉換）。
+@_cdecl("vg_bpmfvs_table_loaded")
+nonisolated public func vgBPMFVSTableLoaded() -> Int32 {
+  mainSync { (ResourceProvision.availabilityReport()["BPMFVS.phonic_table_Z"] ?? false) ? 1 : 0 }
 }
 
 /// 宿主要結束前呼叫：把選字記憶與偏好設定寫回磁碟。

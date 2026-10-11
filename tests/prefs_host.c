@@ -44,6 +44,7 @@ int main(int argc, char **argv) {
     usleep(10000);
   }
   check_int("辭庫載入", vg_lexicon_state(), 1);
+  check_int("注音變體資料表載入（跟辭庫同目錄）", vg_bpmfvs_table_loaded(), 1);
 
   if (setting) {
     check_str("選字鍵的預設值", vg_pref_get("CandidateKeys"), "123456");

@@ -4,3 +4,4 @@ vendor/
 build/
 logs/
 prefix/
+dist/

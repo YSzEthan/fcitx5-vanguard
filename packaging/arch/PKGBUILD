@@ -1,0 +1,41 @@
+# Maintainer: YSEthan <121244749+YSzEthan@users.noreply.github.com>
+#
+# 這份 PKGBUILD 在 Arch 上只編 fcitx5 外掛本體（C++），引擎用事先編好的二進位檔。
+# 原因：引擎要 Swift 6.4 以上，Arch 官方套件庫沒有 Swift。引擎那一包由
+# packaging/stage-engine.sh 在 Ubuntu 24.04 編出，只依賴 glibc（2.38 以上），
+# 內含 Swift 執行期函式庫，裝在 /usr/lib/fcitx5-vanguard/ 這個私有目錄。
+#
+# 兩個 source 目前都是本機檔案（專案還沒有發佈位置），由 packaging/arch/build-pkg.sh
+# 放到 PKGBUILD 旁邊並填入 sha256sums。有了下載網址之後把 source 換成網址即可。
+pkgname=fcitx5-vanguard
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Bopomofo (Zhuyin) input method for Fcitx5 built on the LibVanguard engine'
+arch=('x86_64')
+url='https://github.com/vChewing/vChewing-LibVanguard'
+# 引擎 LGPL-3.0-or-later、辭庫 MulanPSL-2.0、Swift 執行期 Apache-2.0 WITH Swift-exception。
+# 本專案自己的程式碼（外掛本體與 C 介面層）授權尚未決定，決定後補在這裡。
+license=('LGPL-3.0-or-later' 'MulanPSL-2.0' 'Apache-2.0 WITH Swift-exception')
+depends=('fcitx5' 'glibc' 'gcc-libs')
+makedepends=('cmake' 'ninja')
+# 引擎目錄裡的函式庫已經 strip 過，維持跟測試時一模一樣的位元組；外掛本體由 cmake --install --strip 處理。
+options=('!strip' '!debug')
+source=("fcitx5-vanguard-$pkgver.tar.gz"
+        "fcitx5-vanguard-engine-$pkgver-x86_64.tar.zst")
+sha256sums=('SKIP'
+            'SKIP')
+
+build() {
+  cmake -S "fcitx5-vanguard-$pkgver/addon" -B build -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=lib \
+    -DVANGUARD_ENGINE_BUNDLE="$srcdir/engine"
+  cmake --build build
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build --strip
+  install -d "$pkgdir/usr/share/licenses"
+  mv "$pkgdir/usr/share/fcitx5-vanguard/licenses" "$pkgdir/usr/share/licenses/$pkgname"
+}
