@@ -1,11 +1,13 @@
-# 草稿，**沒有實際建置或安裝過**。評估過程與依據見 STATUS.md「階段 5」的 flatpak 一節。
+# **還沒有實際建置過**：由 .github/workflows/build.yml 在每次 push 時建置，但那份流程也還沒跑過。
+# 評估過程與依據見 STATUS.md「階段 5」的 flatpak 一節。
 #
 # 做成 flatpak 版 Fcitx5（org.fcitx.Fcitx5）的擴充。該應用程式的擴充點是
 # org.fcitx.Fcitx5.Addon，掛在 /app/addons/<名稱>/；它的啟動腳本會把每個擴充的
 # lib/fcitx5 加進 FCITX_ADDON_DIRS、share 加進 XDG_DATA_DIRS。
 # 所以這裡只要把前綴設成 /app/addons/Vanguard、函式庫目錄設成 lib，版面就跟 deb／Arch 套件一樣。
 #
-# 建置需要 flatpak-builder 與 org.kde.Sdk//6.11（跟目前 flathub 上的 org.fcitx.Fcitx5 同一版）。
+# 建置需要 flatpak-builder 與 org.kde.Sdk，版本必須跟 flathub 上的 org.fcitx.Fcitx5 同一版
+# （寫這份時是 6.11；CI 會自動查出來並改掉下面那一行）。
 # 引擎仍然用 packaging/stage-engine.sh 編好的 tarball：KDE 的 SDK 裡沒有 Swift。
 id: org.fcitx.Fcitx5.Addon.Vanguard
 branch: stable
@@ -26,7 +28,8 @@ modules:
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
       - -DCMAKE_INSTALL_LIBDIR=lib
-      - -DVANGUARD_ENGINE_BUNDLE=../engine
+      # flatpak-builder 的建置目錄固定在 /run/build/<模組名稱>。
+      - -DVANGUARD_ENGINE_BUNDLE=/run/build/fcitx5-vanguard/engine
     sources:
       # 路徑相對於這個檔案；先在專案根目錄跑過 packaging/stage-engine.sh。
       - type: dir

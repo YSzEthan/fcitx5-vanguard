@@ -4,6 +4,7 @@
 由 tests/run.sh 在隔離的環境裡執行，不要直接跑。
 """
 import os
+import shlex
 import subprocess
 import sys
 import time
@@ -100,7 +101,8 @@ def wait_for_name(bus, name, timeout=10.0):
 def start_fcitx5(bus, log_path):
     log = open(log_path, "a")
     process = subprocess.Popen(
-        ["fcitx5", "--disable=all", "--enable=dbus,dbusfrontend,keyboard,vanguard", "--verbose=vanguard=5"],
+        # 預設直接執行 fcitx5；測 flatpak 版時由 VANGUARD_FCITX5_CMD 換成 `flatpak run …`。
+        shlex.split(os.environ.get("VANGUARD_FCITX5_CMD", "fcitx5")) + ["--disable=all", "--enable=dbus,dbusfrontend,keyboard,vanguard", "--verbose=vanguard=5"],
         stdout=log,
         stderr=subprocess.STDOUT,
     )
@@ -115,7 +117,16 @@ def start_fcitx5(bus, log_path):
 
 
 def stop_fcitx5(process):
-    process.terminate()
+    if os.environ.get("VANGUARD_FCITX5_CMD"):
+        # 經 flatpak 啟動時，我們手上的行程是 flatpak／bwrap，對它送 SIGTERM 會讓沙盒裡的
+        # fcitx5 直接被砍掉、來不及存檔。改走使用者實際會用的路：請 fcitx5 自己結束。
+        try:
+            bus = dbus.SessionBus()
+            dbus.Interface(bus.get_object(SERVICE, "/controller"), "org.fcitx.Fcitx.Controller1").Exit()
+        except dbus.DBusException:
+            pass
+    else:
+        process.terminate()
     try:
         process.wait(timeout=10)
     except subprocess.TimeoutExpired:
@@ -283,8 +294,10 @@ def main():
         client.key(KEY_ESCAPE)
 
         print("14. 偏好設定與使用者資料落地的位置")
-        prefs_path = os.path.join(os.environ["XDG_CONFIG_HOME"], "fcitx5.plist")
-        report.check("偏好設定檔存在", os.path.exists(prefs_path), prefs_path)
+        # 檔名取自行程名稱：一般安裝是 fcitx5，flatpak 版的執行檔叫 fcitx5-bin。
+        found = [name for name in ("fcitx5.plist", "fcitx5-bin.plist")
+                 if os.path.exists(os.path.join(os.environ["XDG_CONFIG_HOME"], name))]
+        report.check("偏好設定檔存在", len(found) == 1, f"{os.environ['XDG_CONFIG_HOME']}：{found}")
         print(f"    使用者資料夾 {user_data}：{sorted(os.listdir(user_data))}")
     finally:
         print(f"    fcitx5 結束碼 {stop_fcitx5(fcitx5)}")

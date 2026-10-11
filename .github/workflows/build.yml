@@ -1,0 +1,120 @@
+# 每次 push：編引擎、跑測試、做 deb，再把外掛做成 flatpak 版 Fcitx5 的擴充。
+# 產物掛在該次執行的 Artifacts：引擎 tarball、deb、fcitx5-vanguard.flatpak。
+#
+# 注意：這份流程寫好時專案還沒有遠端 repo，**還沒有實際跑過**。第一次跑大概需要修。
+name: build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  engine:
+    name: 引擎、測試、deb
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安裝系統套件
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends \
+            patchelf zstd cmake ninja-build \
+            fcitx5 libfcitx5core-dev libfcitx5utils-dev libfcitx5config-dev fcitx5-modules-dev \
+            dbus dbus-daemon python3-dbus python3-gi
+
+      - name: 安裝 Swift（版本取自 .swift-version）
+        run: |
+          curl -fsSLO "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz"
+          tar zxf "swiftly-$(uname -m).tar.gz"
+          ./swiftly init --quiet-shell-followup --assume-yes --skip-install
+          . "$HOME/.local/share/swiftly/env.sh"
+          swiftly install --assume-yes --use "$(cat .swift-version)"
+          swift --version
+          echo "$HOME/.local/share/swiftly/bin" >> "$GITHUB_PATH"
+
+      - name: 抓上游原始碼（固定 commit）
+        run: ./scripts/fetch-vendor.sh
+
+      - name: 編辭庫
+        working-directory: vendor/vChewing-VanguardLexicon
+        run: swift run -c release VCDataBuilder vanguardTextMap
+
+      - name: 整理引擎目錄、編外掛、跑測試
+        run: ./tests/run.sh
+
+      - name: 做 deb
+        run: ./packaging/deb/build-deb.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: engine
+          path: dist/fcitx5-vanguard-engine-*.tar.zst
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb
+          path: dist/*.deb
+          if-no-files-found: error
+
+      - name: 測試失敗時留下 fcitx5 的紀錄
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: |
+            addon/build/sandbox/fcitx5.log
+            addon/build/prefs/*.log
+
+  flatpak:
+    name: flatpak 擴充
+    needs: engine
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: engine
+          path: dist
+
+      - name: 安裝 flatpak-builder
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends flatpak flatpak-builder
+          # Ubuntu 24.04 預設擋掉非特權的 user namespace，flatpak-builder 的沙盒需要它。
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: 安裝 Fcitx5 與它用的那一版 KDE SDK
+        run: |
+          flatpak install --user -y --noninteractive flathub org.fcitx.Fcitx5
+          # 擴充必須跟 Fcitx5 用同一版 SDK。flathub 上的 Fcitx5 換版時這裡自動跟上，不用改 manifest。
+          SDK="$(flatpak info --user --show-sdk org.fcitx.Fcitx5)"   # 形如 org.kde.Sdk/x86_64/6.11
+          SDK_VERSION="${SDK##*/}"
+          echo "Fcitx5 的 SDK：$SDK"
+          flatpak install --user -y --noninteractive flathub "org.kde.Sdk//$SDK_VERSION"
+          sed -i "s|^sdk: org.kde.Sdk//.*|sdk: org.kde.Sdk//$SDK_VERSION|" \
+            packaging/flatpak/org.fcitx.Fcitx5.Addon.Vanguard.yaml
+
+      - name: 建置擴充
+        run: |
+          flatpak-builder --user --force-clean --repo=dist/flatpak-repo dist/flatpak-build \
+            packaging/flatpak/org.fcitx.Fcitx5.Addon.Vanguard.yaml
+          flatpak build-bundle --runtime dist/flatpak-repo dist/fcitx5-vanguard.flatpak \
+            org.fcitx.Fcitx5.Addon.Vanguard stable
+
+      - name: 裝起來檢查外掛載得到引擎
+        run: |
+          flatpak install --user -y --noninteractive dist/fcitx5-vanguard.flatpak
+          flatpak run --command=sh org.fcitx.Fcitx5 -c '
+            set -e
+            ls -l /app/addons/Vanguard/lib/fcitx5/vanguard.so /app/addons/Vanguard/share/fcitx5-vanguard/
+            ! ldd /app/addons/Vanguard/lib/fcitx5/vanguard.so | grep "not found"'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flatpak
+          path: dist/fcitx5-vanguard.flatpak
+          if-no-files-found: error
