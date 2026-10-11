@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
 // fcitx5-vanguard：把引擎（Swift，經 vanguard.h 的 C 介面）接到 fcitx5 的薄殼。
 #include <cstdlib>
 #include <memory>

@@ -13,8 +13,7 @@ pkgrel=1
 pkgdesc='Bopomofo (Zhuyin) input method for Fcitx5 built on the LibVanguard engine'
 arch=('x86_64')
 url='https://github.com/vChewing/vChewing-LibVanguard'
-# 引擎 LGPL-3.0-or-later、辭庫 MulanPSL-2.0、Swift 執行期 Apache-2.0 WITH Swift-exception。
-# 本專案自己的程式碼（外掛本體與 C 介面層）授權尚未決定，決定後補在這裡。
+# 本專案自己的程式碼與引擎 LGPL-3.0-or-later、辭庫 MulanPSL-2.0、Swift 執行期 Apache-2.0 WITH Swift-exception。
 license=('LGPL-3.0-or-later' 'MulanPSL-2.0' 'Apache-2.0 WITH Swift-exception')
 depends=('fcitx5' 'glibc' 'gcc-libs')
 makedepends=('cmake' 'ninja')

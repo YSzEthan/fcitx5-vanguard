@@ -16,6 +16,8 @@ Swift 執行期函式庫（libswift*.so、libFoundation*.so、libdispatch.so 等
   全文：@LICENSES@/swift/LICENSE.txt
 
 fcitx5 外掛本體（vanguard.so）與 C 介面層（libVGEngine.so）
-  本專案自己的程式碼。授權尚未決定，決定前請勿散布這個套件。
+  本專案自己的程式碼。
+  授權：LGPL-3.0-or-later
+  全文：@LICENSES@/fcitx5-vanguard/
 
 各二進位檔對應的原始碼版本記在 @LICENSES@/SOURCES.txt 。

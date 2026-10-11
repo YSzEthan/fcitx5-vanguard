@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
 // fcitx5-vanguard 引擎的 C 介面。
 //
 // 所有函式都必須在宿主的主執行緒呼叫。引擎有一部分工作排在 libdispatch 主佇列上，

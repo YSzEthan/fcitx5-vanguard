@@ -38,7 +38,8 @@ cp "$LEXICON" "$OUT/share/vanguardTextMap.txtMap"
 cp "$LIBVANGUARD/Sources/BPMFVS/Resources/phonic_table_Z.txt" "$OUT/share/"
 cp "$ROOT/engine/include/vanguard.h" "$OUT/include/"
 
-mkdir -p "$OUT/licenses/LibVanguard" "$OUT/licenses/VanguardLexicon" "$OUT/licenses/swift"
+mkdir -p "$OUT/licenses/LibVanguard" "$OUT/licenses/VanguardLexicon" "$OUT/licenses/swift" "$OUT/licenses/fcitx5-vanguard"
+cp "$ROOT/COPYING" "$ROOT/COPYING.LESSER" "$OUT/licenses/fcitx5-vanguard/"
 cp "$LIBVANGUARD/COPYING" "$OUT/licenses/LibVanguard/"
 cp -r "$LIBVANGUARD/LICENSES" "$OUT/licenses/LibVanguard/"
 cp "$LEXICON_REPO"/LICENSE*.txt "$OUT/licenses/VanguardLexicon/"
@@ -57,7 +58,7 @@ vanguardTextMap.txtMap（MulanPSL-2.0）
 
 phonic_table_Z.txt：取自 LibVanguard 的 Sources/BPMFVS/Resources/，授權見 LibVanguard/LICENSES/。
 
-libVGEngine.so：本專案 engine/ 目錄，把引擎包成 C 介面。
+libVGEngine.so：本專案 engine/ 目錄，把引擎包成 C 介面（LGPL-3.0-or-later，見 fcitx5-vanguard/）。
 
 其餘 lib*.so：Swift 執行期函式庫（Apache-2.0 WITH Swift-exception），
   $(swiftc --version 2>/dev/null | head -1)
