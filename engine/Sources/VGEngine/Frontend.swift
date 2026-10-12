@@ -112,16 +112,62 @@ final class CandidateController: CtlCandidateProtocol {
 
 // MARK: - SessionUI
 
-/// 第一版只提供候選字；tooltip、浮動組字窗、Shift／Caps Lock 切換都不做。
+/// 引擎的 tooltip 在這裡只留下文字，交給宿主畫在輸入面板的輔助文字列。
+final class TextTooltip: TooltipUIProtocol {
+  private(set) var text = ""
+  private var expiry: Date?
+  var onUpdate: () -> () = {}
+
+  var isShown: Bool { !text.isEmpty }
+
+  func show(
+    tooltip: String, at _: CGPoint,
+    bottomOutOfScreenAdjustmentHeight _: Double,
+    direction _: UILayoutOrientation, duration: Double
+  ) {
+    show(tooltip, seconds: duration)
+  }
+
+  func show(_ tooltip: String, seconds: Double) {
+    // 引擎的介面文字靠 NSLocalizedString 翻譯，翻譯表在 macOS 版的 app 裡，這裡沒有，
+    // 拿到的會是「i18n:…」這種原始 key。與其把 key 秀給使用者看，不如不顯示。
+    let shown = tooltip.contains("i18n:") ? "" : tooltip
+    guard shown != text else { return }
+    text = shown
+    expiry = (seconds > 0 && !shown.isEmpty) ? Date().addingTimeInterval(seconds) : nil
+    onUpdate()
+  }
+
+  func hide() {
+    guard !text.isEmpty else { return }
+    text = ""
+    expiry = nil
+    onUpdate()
+  }
+
+  /// 宿主定時呼叫：時間到了就收起來。
+  func tick() {
+    if let expiry, expiry <= Date() { hide() }
+  }
+
+  func setColor(state _: TooltipColorState) {}
+  func sync(accent _: HSBA?, locale _: String) {}
+}
+
+/// 候選字、tooltip、狀態提示有接；浮動組字窗不做。
+/// Shift 切換英數由宿主偵測後呼叫 `vg_toggle_ascii()`，不走引擎的 shiftKeyUpChecker。
 final class SessionUI: SessionUIProtocol {
   var currentSessionID = UUID()
   let candidateController = CandidateController()
+  let tooltip = TextTooltip()
+  /// 模式切換之類的一過性提示；跟 tooltip 分開，免得互相蓋掉。
+  let status = TextTooltip()
 
   var shiftKeyUpChecker: (any ShiftKeyUpCheckerProtocol)? { nil }
   var capsLockHitChecker: (any HitCheckerProtocol)? { nil }
   var capsLockToggler: (any CapsLockTogglerProtocol)? { nil }
   var pcb: (any PCBProtocol)? { nil }
-  var tooltipUI: (any TooltipUIProtocol)? { nil }
-  var statusUI: (any TooltipUIProtocol)? { nil }
+  var tooltipUI: (any TooltipUIProtocol)? { tooltip }
+  var statusUI: (any TooltipUIProtocol)? { status }
   var candidateUI: (any CtlCandidateProtocol)? { candidateController }
 }

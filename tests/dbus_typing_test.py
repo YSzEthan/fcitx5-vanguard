@@ -22,6 +22,9 @@ KEY_RETURN = 0xFF0D
 KEY_ESCAPE = 0xFF1B
 KEY_LEFT = 0xFF51
 KEY_DOWN = 0xFF54
+KEY_PAGE_UP = 0xFF55
+KEY_PAGE_DOWN = 0xFF56
+KEY_SHIFT_R = 0xFFE2
 STATE_SHIFT = 1 << 0
 STATE_NUM_LOCK = 1 << 4
 
@@ -34,6 +37,10 @@ class Client:
         self.preedit = ""
         self.candidates = []
         self.candidate_cursor = -1
+        self.aux_up = ""
+        self.has_prev = False
+        self.has_next = False
+        self.layout = 0
         self.context = GLib.MainContext.default()
 
         portal = bus.get_object(SERVICE, "/org/freedesktop/portal/inputmethod")
@@ -53,9 +60,13 @@ class Client:
     def on_preedit(self, segments, _cursor):
         self.preedit = "".join(str(text) for text, _flags in segments)
 
-    def on_client_side_ui(self, _preedit, _cursor, _aux_up, _aux_down, candidates, cursor, *_rest):
+    def on_client_side_ui(self, _preedit, _cursor, aux_up, _aux_down, candidates, cursor, _layout, has_prev, has_next):
         self.candidates = [(str(label), str(text)) for label, text in candidates]
         self.candidate_cursor = int(cursor)
+        self.aux_up = "".join(str(text) for text, _flags in aux_up)
+        self.has_prev = bool(has_prev)
+        self.has_next = bool(has_next)
+        self.layout = int(_layout)
 
     def settle(self, seconds=0.08):
         """讓 DBus 訊號進來。fcitx5 的回覆是非同步送達的。"""
@@ -70,6 +81,10 @@ class Client:
         self.ic.ProcessKeyEvent(dbus.UInt32(sym), dbus.UInt32(0), dbus.UInt32(state), True, dbus.UInt32(0))
         self.settle()
         return handled
+
+    def raw_key(self, sym, state, is_release):
+        self.ic.ProcessKeyEvent(dbus.UInt32(sym), dbus.UInt32(0), dbus.UInt32(state), is_release, dbus.UInt32(0))
+        self.settle()
 
     def type(self, text, state=0):
         return [self.key(ord(ch), state) for ch in text]
@@ -269,7 +284,97 @@ def main():
         client.key(KEY_ESCAPE)
         client.key(KEY_ESCAPE)
 
-        print("11. 閒置 1 秒後 fcitx5 仍然正常")
+        print("11. 按著 Shift 打全形標點（fcitx5 送來的是換檔後的符號，例如 Shift+, 是「<」）")
+        before = len(client.commits)
+        client.type("su3")
+        handled = [client.key(ord(ch), STATE_SHIFT) for ch in "<>!?"]
+        report.equal("每個鍵都被引擎攔下", handled, [True, True, True, True])
+        report.equal("組字區", client.preedit, "你，。！？")
+        client.key(KEY_RETURN)
+        report.equal("送字", client.commits[before:], ["你，。！？"])
+
+        print("12. 單獨按一下右 Shift 切換英數模式")
+        before = len(client.commits)
+        client.type("su3")
+        client.key(KEY_SHIFT_R)
+        report.equal("組字到一半的字先送出去", client.commits[before:], ["你"])
+        report.equal("提示文字", client.aux_up, "英數模式")
+        report.equal("英數模式下按鍵放行給應用程式", client.type("ab1"), [False, False, False])
+        report.equal("組字區是空的", client.preedit, "")
+        # 按著 Shift 打了別的字再放開，不算「單獨按一下」，模式不能變。
+        client.raw_key(KEY_SHIFT_R, 0, False)
+        client.key(ord("A"), STATE_SHIFT)
+        client.raw_key(KEY_SHIFT_R, STATE_SHIFT, True)
+        report.equal("按著 Shift 打字不會切換模式", client.type("a"), [False])
+        client.key(KEY_SHIFT_R)
+        report.equal("再按一下切回中文，提示文字", client.aux_up, "中文模式")
+        client.type("su3")
+        report.equal("切回來之後可以打注音", client.preedit, "你")
+        report.equal("打字後提示收起來", client.aux_up, "")
+        client.key(KEY_ESCAPE)
+
+        print("13. 候選字翻頁：選字視窗要知道有沒有上一頁、下一頁")
+        client.type("su3")
+        client.key(KEY_DOWN)
+        first_page = candidate_texts(client)
+        report.check("第一頁：沒有上一頁、有下一頁", (client.has_prev, client.has_next) == (False, True),
+                     f"has_prev={client.has_prev} has_next={client.has_next}")
+        client.key(KEY_PAGE_DOWN)
+        report.check("PageDown 之後內容換了、有上一頁", candidate_texts(client) != first_page and client.has_prev,
+                     f"{candidate_texts(client)[:6]}")
+        client.ic.NextPage()  # 滑鼠點選字視窗的「下一頁」箭頭
+        client.settle(0.3)
+        third_page = candidate_texts(client)
+        client.ic.PrevPage()
+        client.settle(0.3)
+        report.check("滑鼠點翻頁箭頭也會翻", third_page != candidate_texts(client) and third_page != first_page,
+                     f"點下一頁 {third_page[:3]}，再點上一頁 {candidate_texts(client)[:3]}")
+        client.key(KEY_ESCAPE)
+        client.key(KEY_ESCAPE)
+
+        print("14. 符號選單（` 鍵）：進得去、選得到、Esc 出得來")
+        before = len(client.commits)
+        client.key(ord("`"))
+        menu = candidate_texts(client)
+        print(f"    選單第一頁 {menu}")
+        report.check("選單有內容", "常用標點" in menu)
+        client.key(ord("1"))
+        report.check("進到子選單", "，" in candidate_texts(client), f"{candidate_texts(client)}")
+        client.key(KEY_ESCAPE)
+        report.check("Esc 回上一層", "常用標點" in candidate_texts(client))
+        client.key(KEY_ESCAPE)
+        report.equal("再按 Esc 離開選單", candidate_texts(client), [])
+        client.type("su3")
+        report.equal("離開後可以正常打字", client.preedit, "你")
+        client.key(KEY_ESCAPE)
+        report.equal("整個過程沒有多送字", client.commits[before:], [])
+
+        print("15. fcitx5 設定介面：讀得到目前的值，改了立刻生效")
+        uri = "fcitx://config/addon/vanguard"
+        values, _description = controller.GetConfig(uri)
+        report.equal("讀到的預設值", (str(values["HorizontalCandidateList"]), str(values["CandidateKeys"])), ("True", "123456"))
+
+        def set_config(horizontal, keys):
+            controller.SetConfig(uri, dbus.Dictionary(
+                {"HorizontalCandidateList": horizontal, "CandidateKeys": keys}, signature="sv", variant_level=1))
+            client.settle(0.3)
+
+        set_config("False", "123456789")
+        client.type("su3")
+        client.key(KEY_DOWN)
+        report.equal("一頁變成 9 個", len(client.candidates), 9)
+        report.equal("第 9 個的標籤", client.candidates[8][0] if len(client.candidates) == 9 else None, "9. ")
+        report.equal("排列方向變成直排（1 直排、2 橫排）", client.layout, 1)
+        client.key(KEY_ESCAPE)
+        client.key(KEY_ESCAPE)
+        set_config("True", "123456")
+        client.type("su3")
+        client.key(KEY_DOWN)
+        report.equal("改回來：一頁 6 個、橫排", (len(client.candidates), client.layout), (6, 2))
+        client.key(KEY_ESCAPE)
+        client.key(KEY_ESCAPE)
+
+        print("16. 閒置 1 秒後 fcitx5 仍然正常")
         client.settle(1.0)
         report.check("fcitx5 行程還活著", fcitx5.poll() is None)
     finally:
@@ -281,19 +386,19 @@ def main():
         waited = wait_for_lexicon(client)
         report.check("辭庫載入完成", waited is not None, f"等了 {waited:.2f} 秒" if waited is not None else "逾時")
 
-        print("12. 選字記憶還在：第 3 步選過的詞變成首選")
+        print("17. 選字記憶還在：第 3 步選過的詞變成首選")
         client.type("su065j/ ")
         report.equal("組字區", client.preedit, chosen)
         client.key(KEY_ESCAPE)
 
-        print("13. 使用者語彙還在")
+        print("18. 使用者語彙還在")
         client.type(phrase_keys)
         client.key(KEY_DOWN)
         report.check("候選字裡有第 10 步加的詞", phrase in candidate_texts(client), f"{candidate_texts(client)[:6]}")
         client.key(KEY_ESCAPE)
         client.key(KEY_ESCAPE)
 
-        print("14. 偏好設定與使用者資料落地的位置")
+        print("19. 偏好設定與使用者資料落地的位置")
         # 檔名取自行程名稱：一般安裝是 fcitx5，flatpak 版的執行檔叫 fcitx5-bin。
         found = [name for name in ("fcitx5.plist", "fcitx5-bin.plist")
                  if os.path.exists(os.path.join(os.environ["XDG_CONFIG_HOME"], name))]

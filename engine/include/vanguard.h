@@ -45,6 +45,16 @@ int32_t vg_is_activated(void);
 int32_t vg_key_down(uint32_t key_sym, uint32_t key_states);
 
 // 輸入焦點進入。
+// 切換英數模式。宿主偵測到「單獨按一下 Shift」時呼叫；right_shift：0 左、1 右。
+// 回傳切換後的狀態：1 英數、0 中文、-1 沒有切換（偏好設定關掉了這一側的 Shift）。
+// 英數模式下 vg_key_down 一律回傳 0，按鍵交給應用程式。
+int32_t vg_toggle_ascii(int32_t right_shift);
+int32_t vg_is_ascii_mode(void);
+
+// 要顯示在輸入面板輔助列的提示文字（模式切換提示等）；沒有時是空字串。會自己過期，
+// 過期時呼叫 on_update。回傳的字串要用 vg_free() 釋放。
+char *vg_hint_text(void);
+
 void vg_focus_in(void);
 // 清掉未完成的輸入。commit_existing 非 0 時先把組字區內容送出。
 void vg_reset(int32_t commit_existing);
@@ -63,6 +73,11 @@ int32_t vg_candidate_highlighted(void);     // 這一頁裡反白的那一個，
 int32_t vg_candidate_has_prev_page(void);
 int32_t vg_candidate_has_next_page(void);
 // 直接選定這一頁的第 index 個候選字（滑鼠點選用）。
+// 頁數與目前頁次（從 0 起算）；排列方向取自偏好設定 UseHorizontalCandidateList（1 橫排、0 直排）。
+int32_t vg_candidate_page_count(void);
+int32_t vg_candidate_page_index(void);
+int32_t vg_candidate_layout_horizontal(void);
+
 void vg_candidate_select(int32_t index);
 
 // 偏好設定。key 是上游 UserDef 的名稱（例如 "CandidateKeys"、"KeyboardParser4Zhuyin"）。

@@ -6,6 +6,9 @@
 #include <utility>
 #include <vector>
 
+#include <fcitx-config/configuration.h>
+#include <fcitx-config/option.h>
+#include <fcitx-config/rawconfig.h>
 #include <fcitx-utils/event.h>
 #include <fcitx-utils/log.h>
 #include <fcitx-utils/standardpath.h>
@@ -30,6 +33,8 @@ FCITX_DEFINE_LOG_CATEGORY(vanguard_log, "vanguard");
 
 // 閒置時排空引擎主佇列的間隔。背景執行緒等主佇列時，最久會等這麼久。
 constexpr uint64_t kPumpIntervalUsec = 50000;
+// 單獨按一下 Shift 切換英數：按下到放開不超過這麼久、中間沒有按別的鍵才算。
+constexpr uint64_t kShiftTapMaxUsec = 500000;
 
 // 引擎回傳的 C 字串要用 vg_free() 釋放。
 std::string takeString(char *raw) {
@@ -37,6 +42,24 @@ std::string takeString(char *raw) {
     vg_free(raw);
     return result;
 }
+
+// fcitx5 設定介面裡看得到的選項。值存在引擎自己的偏好設定裡（見 vg_pref_get／vg_pref_set），
+// 這裡只是把其中幾項搬到設定視窗上，不另外存檔。
+FCITX_CONFIGURATION(
+    VanguardConfig,
+    fcitx::Option<bool> horizontalCandidates{this, "HorizontalCandidateList", "選字視窗橫排（關掉就是直排）", true};
+    fcitx::Option<std::string> candidateKeys{this, "CandidateKeys",
+                                             "選字鍵（有幾個字元，一頁就有幾個候選字，例如 123456789）", "123456"};
+    fcitx::Option<bool> shiftLeft{this, "ToggleWithLeftShift", "單獨按一下左 Shift 切換中英", true};
+    fcitx::Option<bool> shiftRight{this, "ToggleWithRightShift", "單獨按一下右 Shift 切換中英", true};
+    fcitx::Option<bool> shiftNotice{this, "ShowNoticeWhenToggling", "切換中英時顯示提示", true};);
+
+// 設定視窗的選項對應到引擎的哪個偏好設定。
+constexpr const char *kPrefHorizontal = "UseHorizontalCandidateList";
+constexpr const char *kPrefCandidateKeys = "CandidateKeys";
+constexpr const char *kPrefShiftLeft = "TogglingAlphanumericalModeWithLShift";
+constexpr const char *kPrefShiftRight = "TogglingAlphanumericalModeWithRShift";
+constexpr const char *kPrefShiftNotice = "ShowNotificationsWhenTogglingShift";
 
 class VanguardEngine;
 
@@ -50,6 +73,27 @@ public:
 private:
     VanguardEngine *engine_;
     int index_;
+};
+
+// 引擎自己分頁，這裡只拿到目前這一頁。翻頁狀態要另外告訴 fcitx5，選字視窗才會畫出翻頁箭頭；
+// 使用者用滑鼠點箭頭時再轉回去請引擎翻頁。
+class VanguardCandidateList final : public fcitx::CommonCandidateList {
+public:
+    VanguardCandidateList(VanguardEngine *engine, int page, int pages)
+        : engine_(engine), page_(page), pages_(pages) {}
+
+    bool hasPrev() const override { return page_ > 0; }
+    bool hasNext() const override { return page_ + 1 < pages_; }
+    void prev() override;
+    void next() override;
+    bool usedNextBefore() const override { return true; }
+    int totalPages() const override { return pages_; }
+    int currentPage() const override { return page_; }
+
+private:
+    VanguardEngine *engine_;
+    int page_;
+    int pages_;
 };
 
 class VanguardEngine final : public fcitx::InputMethodEngineV2 {
@@ -121,8 +165,10 @@ public:
     }
 
     void keyEvent(const fcitx::InputMethodEntry &, fcitx::KeyEvent &keyEvent) override {
+        if (!ready_) return;
+        if (handleShiftTap(keyEvent)) return;
         // 放開的事件與單獨的修飾鍵不送進引擎。
-        if (!ready_ || keyEvent.isRelease() || keyEvent.key().isModifier()) return;
+        if (keyEvent.isRelease() || keyEvent.key().isModifier()) return;
         inputContext_ = keyEvent.inputContext()->watch();
 
         const fcitx::Key key = keyEvent.rawKey();
@@ -134,13 +180,54 @@ public:
         if (handled) keyEvent.filterAndAccept();
     }
 
+    // 設定視窗打開時 fcitx5 來要目前的值：每次都從引擎讀，引擎才是唯一的來源。
+    const fcitx::Configuration *getConfig() const override {
+        if (ready_) {
+            config_.horizontalCandidates.setValue(prefBool(kPrefHorizontal));
+            config_.candidateKeys.setValue(takeString(vg_pref_get(kPrefCandidateKeys)));
+            config_.shiftLeft.setValue(prefBool(kPrefShiftLeft));
+            config_.shiftRight.setValue(prefBool(kPrefShiftRight));
+            config_.shiftNotice.setValue(prefBool(kPrefShiftNotice));
+        }
+        return &config_;
+    }
+
+    // 使用者在設定視窗按了套用：寫回引擎，引擎會立刻存檔並套用。
+    void setConfig(const fcitx::RawConfig &raw) override {
+        if (!ready_) return;
+        config_.load(raw, true);
+        vg_pref_set(kPrefHorizontal, *config_.horizontalCandidates ? "true" : "false");
+        // 引擎會檢查選字鍵合不合法，不合法就回到預設值。
+        vg_pref_set(kPrefCandidateKeys, config_.candidateKeys->c_str());
+        vg_pref_set(kPrefShiftLeft, *config_.shiftLeft ? "true" : "false");
+        vg_pref_set(kPrefShiftRight, *config_.shiftRight ? "true" : "false");
+        vg_pref_set(kPrefShiftNotice, *config_.shiftNotice ? "true" : "false");
+        dirty_ = true;
+        pump();
+    }
+
+    // 狀態列（系統匣）上輸入法圖示旁的文字：英數模式時顯示「英」。
+    std::string subMode(const fcitx::InputMethodEntry &, fcitx::InputContext &) override {
+        return (ready_ && vg_is_ascii_mode()) ? "英數" : "";
+    }
+
+    std::string subModeLabelImpl(const fcitx::InputMethodEntry &, fcitx::InputContext &) override {
+        return (ready_ && vg_is_ascii_mode()) ? "英" : "";
+    }
+
     void selectCandidate(fcitx::InputContext *inputContext, int index) {
         inputContext_ = inputContext->watch();
         vg_candidate_select(index);
         pump();
     }
 
+    // 滑鼠點了選字視窗的翻頁箭頭。這時 fcitx5 還在用那份候選字清單，不能當場重畫（會把它刪掉），
+    // 所以只記下來，由定時器在下一輪處理。
+    void requestPage(int delta) { pendingPage_ += delta; }
+
 private:
+    static bool prefBool(const char *key) { return takeString(vg_pref_get(key)) == "true"; }
+
     static void onCommit(void *context, const char *text) {
         auto *self = static_cast<VanguardEngine *>(context);
         VANGUARD_DEBUG() << "commit: " << text;
@@ -150,7 +237,46 @@ private:
     // 一次按鍵可能觸發很多次更新，這裡只記下來，等 pump() 結束時一起畫。
     static void onUpdate(void *context) { static_cast<VanguardEngine *>(context)->dirty_ = true; }
 
+    // 單獨按一下 Shift（中間沒有按別的鍵）切換英數模式。回傳 true 表示這個事件處理完了。
+    // 注意：fcitx5 預設把左 Shift 設成「暫時切換到第一個輸入法」（全域設定的 AltTriggerKeys），
+    // 那個設定開著時左 Shift 在放開前就被 fcitx5 攔走，這裡只會收到右 Shift。
+    bool handleShiftTap(fcitx::KeyEvent &keyEvent) {
+        const fcitx::Key key = keyEvent.rawKey();
+        const bool isShift = key.sym() == FcitxKey_Shift_L || key.sym() == FcitxKey_Shift_R;
+        if (!keyEvent.isRelease()) {
+            const auto others = key.states().unset(fcitx::KeyState::Shift)
+                                    .unset(fcitx::KeyState::NumLock)
+                                    .unset(fcitx::KeyState::CapsLock);
+            if (isShift && others == fcitx::KeyStates()) {
+                shiftDown_ = key.sym();
+                shiftDownAt_ = fcitx::now(CLOCK_MONOTONIC);
+            } else {
+                shiftDown_ = FcitxKey_None;
+            }
+            return false;
+        }
+        const bool tapped = isShift && key.sym() == shiftDown_ &&
+                            fcitx::now(CLOCK_MONOTONIC) - shiftDownAt_ <= kShiftTapMaxUsec;
+        shiftDown_ = FcitxKey_None;
+        if (!tapped) return false;
+
+        auto *inputContext = keyEvent.inputContext();
+        inputContext_ = inputContext->watch();
+        if (vg_toggle_ascii(key.sym() == FcitxKey_Shift_R ? 1 : 0) < 0) return false;
+        dirty_ = true;
+        pump();
+        inputContext->updateUserInterface(fcitx::UserInterfaceComponent::StatusArea);
+        return true;
+    }
+
     void pump() {
+        if (pendingPage_ != 0) {
+            const int delta = std::exchange(pendingPage_, 0);
+            for (int i = 0; i < std::abs(delta); i++) {
+                vg_key_down(delta > 0 ? FcitxKey_Page_Down : FcitxKey_Page_Up, 0);
+            }
+            dirty_ = true;
+        }
         vg_pump();
         if (!lexiconReported_) {
             // 辭庫是非同步載入的，好了（或失敗）之後記一筆，方便從紀錄看出啟動花了多久。
@@ -185,11 +311,18 @@ private:
             }
         }
 
+        // 模式切換之類的提示，畫在選字視窗最上面那一列。
+        const std::string hint = takeString(vg_hint_text());
+        if (!hint.empty()) panel.setAuxUp(fcitx::Text(hint));
+
         // 引擎自己分頁，這裡只把目前這一頁交給 fcitx5 畫。
         const int32_t count = vg_candidates_visible() ? vg_candidate_count() : 0;
         if (count > 0) {
-            auto list = std::make_unique<fcitx::CommonCandidateList>();
-            list->setLayoutHint(fcitx::CandidateLayoutHint::Horizontal);
+            auto list = std::make_unique<VanguardCandidateList>(this, vg_candidate_page_index(),
+                                                                vg_candidate_page_count());
+            // 橫排或直排跟著引擎的偏好設定 UseHorizontalCandidateList。
+            list->setLayoutHint(vg_candidate_layout_horizontal() ? fcitx::CandidateLayoutHint::Horizontal
+                                                                 : fcitx::CandidateLayoutHint::Vertical);
             list->setPageSize(count);
             std::vector<std::string> labels;
             for (int32_t i = 0; i < count; i++) {
@@ -210,10 +343,17 @@ private:
     bool ready_ = false;
     bool dirty_ = false;
     bool lexiconReported_ = false;
+    int pendingPage_ = 0;
+    mutable VanguardConfig config_;
+    fcitx::KeySym shiftDown_ = FcitxKey_None;
+    uint64_t shiftDownAt_ = 0;
     // 引擎目前在服務的輸入情境。第一版所有情境共用一個引擎 session。
     fcitx::TrackableObjectReference<fcitx::InputContext> inputContext_;
     std::unique_ptr<fcitx::EventSourceTime> pumpTimer_;
 };
+
+void VanguardCandidateList::prev() { engine_->requestPage(-1); }
+void VanguardCandidateList::next() { engine_->requestPage(1); }
 
 void VanguardCandidateWord::select(fcitx::InputContext *inputContext) const {
     engine_->selectCandidate(inputContext, index_);

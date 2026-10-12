@@ -54,10 +54,13 @@ nonisolated public func vgInit(
       ResourceProvision.specifyBPMFVSTable(table)
     }
 
+    SymbolMenu.install()
     let engine = Engine()
     engine.proxy.onCommit = { host.commit($0) }
     engine.proxy.onUpdate = { host.update() }
     engine.ui.candidateController.onUpdate = { host.update() }
+    engine.ui.tooltip.onUpdate = { host.update() }
+    engine.ui.status.onUpdate = { host.update() }
 
     let proxyAddr = UInt(bitPattern: Unmanaged.passUnretained(engine.proxy).toOpaque())
     // 預設是 { _ in false }，不改的話 session.clientProxy 永遠是 nil。
@@ -112,6 +115,10 @@ nonisolated public func vgShutdown() {
 @_cdecl("vg_pump")
 nonisolated public func vgPump() {
   _ = RunLoop.main.run(mode: .default, before: Date())
+  mainSync {
+    Engine.shared?.ui.tooltip.tick()
+    Engine.shared?.ui.status.tick()
+  }
 }
 
 @_cdecl("vg_is_activated")
@@ -122,13 +129,69 @@ nonisolated public func vgIsActivated() -> Int32 {
 @_cdecl("vg_key_down")
 nonisolated public func vgKeyDown(_ keySym: UInt32, _ keyStates: UInt32) -> Int32 {
   mainSync {
-    guard let session = Engine.shared?.session else { return 0 }
+    guard let engine = Engine.shared, let session = engine.session else { return 0 }
+    // 模式切換的提示看到下一個按鍵為止。
+    engine.ui.status.hide()
     // 上游對照表只收大寫字母的 keysym（0x41–0x5A），fcitx5 沒按 Shift 時給的是小寫。
-    let normalized = (0x61 ... 0x7A).contains(keySym) ? keySym - 0x20 : keySym
+    var normalized = (0x61 ... 0x7A).contains(keySym) ? keySym - 0x20 : keySym
+    // 按著 Shift 時 fcitx5 給的是換檔後的符號（例如 Shift+, 給「<」），上游對照表只認實體鍵
+    // 本身的符號加 Shift 旗標。這裡照美式鍵盤換回去；大千等注音排列本來就以美式鍵位為準。
+    if keyStates & 1 != 0, let base = shiftedSymbolBase[keySym] { normalized = base }
     guard let event = KBEvent(fcitxKeyCode: normalized, fcitxModifierFlags: keyStates, isKeyDown: true)
     else { return 0 }
-    return session.handleEvent(event) ? 1 : 0
+    let handled = session.handleEvent(event)
+    // 保險：選單型的狀態如果沒有任何候選字，引擎會把之後所有按鍵都吃掉而且出不來。
+    if session.state.type == .ofSymbolTable, session.state.candidates.isEmpty {
+      session.switchState(.ofAbortion())
+    }
+    return handled ? 1 : 0
   }
+}
+
+/// 美式鍵盤上「Shift 之後的符號」對回「實體鍵本身的符號」。
+nonisolated private let shiftedSymbolBase: [UInt32: UInt32] = {
+  let pairs: [(Character, Character)] = [
+    ("!", "1"), ("@", "2"), ("#", "3"), ("$", "4"), ("%", "5"), ("^", "6"), ("&", "7"), ("*", "8"),
+    ("(", "9"), (")", "0"), ("_", "-"), ("+", "="), ("{", "["), ("}", "]"), ("|", "\\"),
+    (":", ";"), ("\"", "'"), ("<", ","), (">", "."), ("?", "/"), ("~", "`"),
+  ]
+  return Dictionary(uniqueKeysWithValues: pairs.map { (UInt32($0.0.asciiValue!), UInt32($0.1.asciiValue!)) })
+}()
+
+// MARK: - 英數模式、提示文字
+
+/// 切換英數模式（宿主偵測到單獨按一下 Shift 時呼叫）。回傳切換後的狀態：1 英數、0 中文、-1 沒有切換。
+/// `rightShift`：0 左 Shift、1 右 Shift；各自受偏好設定 TogglingAlphanumericalModeWithLShift／RShift 控制。
+@_cdecl("vg_toggle_ascii")
+nonisolated public func vgToggleASCII(_ rightShift: Int32) -> Int32 {
+  mainSync {
+    guard let engine = Engine.shared, let session = engine.session else { return -1 }
+    let prefs = PrefMgr.sharedSansDidSetOps
+    let allowed = rightShift != 0 ? prefs.togglingAlphanumericalModeWithRShift : prefs.togglingAlphanumericalModeWithLShift
+    guard allowed else { return -1 }
+    // 還在組字的內容先送出去，不然切到英數後它會卡在組字區。
+    session.resetInputHandler(forceComposerCleanup: true, commitExisting: true)
+    session.isASCIIMode.toggle()
+    let ascii = session.isASCIIMode
+    if prefs.showNotificationsWhenTogglingShift {
+      engine.ui.status.show(ascii ? "英數模式" : "中文模式", seconds: 1.2)
+    }
+    return ascii ? 1 : 0
+  }
+}
+
+@_cdecl("vg_is_ascii_mode")
+nonisolated public func vgIsASCIIMode() -> Int32 {
+  mainSync { (Engine.shared?.session?.isASCIIMode ?? false) ? 1 : 0 }
+}
+
+/// 要顯示在輸入面板輔助列的提示文字（引擎的 tooltip 優先，其次是模式切換提示）；沒有就回空字串。
+@_cdecl("vg_hint_text")
+nonisolated public func vgHintText() -> UnsafeMutablePointer<CChar>? {
+  duplicate(mainSync {
+    guard let ui = Engine.shared?.ui else { return "" }
+    return ui.tooltip.text.isEmpty ? ui.status.text : ui.tooltip.text
+  })
 }
 
 @_cdecl("vg_focus_in")
@@ -222,6 +285,26 @@ nonisolated public func vgCandidateHasNextPage() -> Int32 {
     let page = currentPage()
     return page.range.upperBound < page.total ? 1 : 0
   }
+}
+
+/// 候選字的頁數與目前頁次（從 0 起算）。沒有候選字時頁數是 0。
+@_cdecl("vg_candidate_page_count")
+nonisolated public func vgCandidatePageCount() -> Int32 {
+  mainSync {
+    guard let controller = Engine.shared?.ui.candidateController, controller.visible else { return 0 }
+    return Int32((controller.candidates.count + controller.pageSize - 1) / controller.pageSize)
+  }
+}
+
+@_cdecl("vg_candidate_page_index")
+nonisolated public func vgCandidatePageIndex() -> Int32 {
+  mainSync { Int32(Engine.shared?.ui.candidateController.pageIndex ?? 0) }
+}
+
+/// 候選字視窗的排列方向，取自偏好設定 UseHorizontalCandidateList：1 橫排、0 直排。
+@_cdecl("vg_candidate_layout_horizontal")
+nonisolated public func vgCandidateLayoutHorizontal() -> Int32 {
+  mainSync { PrefMgr.sharedSansDidSetOps.useHorizontalCandidateList ? 1 : 0 }
 }
 
 @_cdecl("vg_candidate_select")
