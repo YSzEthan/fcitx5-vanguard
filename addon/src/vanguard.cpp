@@ -52,6 +52,8 @@ FCITX_CONFIGURATION(
     fcitx::Option<bool> horizontalCandidates{this, "HorizontalCandidateList", "選字視窗橫排（關掉就是直排）", true};
     fcitx::Option<std::string> candidateKeys{this, "CandidateKeys",
                                              "選字鍵（有幾個字元，一頁就有幾個候選字，例如 123456789）", "123456"};
+    fcitx::Option<bool> mixedAlnum{this, "MixedAlphanumerical",
+                                   "中英混打：不用切換，按鍵不成注音時自動當成英文（Shift+空白鍵可強制送出英文）", false};
     fcitx::Option<bool> shiftLeft{this, "ToggleWithLeftShift", "單獨按一下左 Shift 切換中英", true};
     fcitx::Option<bool> shiftRight{this, "ToggleWithRightShift", "單獨按一下右 Shift 切換中英", true};
     fcitx::Option<bool> shiftNotice{this, "ShowNoticeWhenToggling", "切換中英時顯示提示", true};);
@@ -59,6 +61,7 @@ FCITX_CONFIGURATION(
 // 設定視窗的選項對應到引擎的哪個偏好設定。
 constexpr const char *kPrefHorizontal = "UseHorizontalCandidateList";
 constexpr const char *kPrefCandidateKeys = "CandidateKeys";
+constexpr const char *kPrefMixedAlnum = "MixedAlphanumericalEnabled";
 constexpr const char *kPrefShiftLeft = "TogglingAlphanumericalModeWithLShift";
 constexpr const char *kPrefShiftRight = "TogglingAlphanumericalModeWithRShift";
 constexpr const char *kPrefShiftNotice = "ShowNotificationsWhenTogglingShift";
@@ -196,6 +199,7 @@ public:
         if (ready_) {
             config_.horizontalCandidates.setValue(prefBool(kPrefHorizontal));
             config_.candidateKeys.setValue(takeString(vg_pref_get(kPrefCandidateKeys)));
+            config_.mixedAlnum.setValue(prefBool(kPrefMixedAlnum));
             config_.shiftLeft.setValue(prefBool(kPrefShiftLeft));
             config_.shiftRight.setValue(prefBool(kPrefShiftRight));
             config_.shiftNotice.setValue(prefBool(kPrefShiftNotice));
@@ -210,6 +214,7 @@ public:
         vg_pref_set(kPrefHorizontal, *config_.horizontalCandidates ? "true" : "false");
         // 引擎會檢查選字鍵合不合法，不合法就回到預設值。
         vg_pref_set(kPrefCandidateKeys, config_.candidateKeys->c_str());
+        vg_pref_set(kPrefMixedAlnum, *config_.mixedAlnum ? "true" : "false");
         vg_pref_set(kPrefShiftLeft, *config_.shiftLeft ? "true" : "false");
         vg_pref_set(kPrefShiftRight, *config_.shiftRight ? "true" : "false");
         vg_pref_set(kPrefShiftNotice, *config_.shiftNotice ? "true" : "false");
