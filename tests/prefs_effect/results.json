@@ -1,0 +1,1378 @@
+{
+ "AcceptLeadingIntonations": {
+  "differing": {
+   "false": {
+    "first": [
+     "  3su                    h=1 組字區「ㄧ」@3",
+     "  3su                    h=1 組字區「ˇㄋㄧ」@8"
+    ],
+    "lines": 1
+   }
+  },
+  "status": "effect",
+  "values": [
+   "false"
+  ]
+ },
+ "AllowRescoringSingleKanjiCandidates": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "AlphanumericalKeyboardLayout": {
+  "reason": "型別 string 不自動測",
+  "status": "skipped"
+ },
+ "AlsoConfirmAssociatedCandidatesByEnter": {
+  "differing": {},
+  "prerequisites": [
+   [
+    "AssociatedPhrasesEnabled",
+    "true"
+   ]
+  ],
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "AlwaysExpandCandidateWindow": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "AlwaysShowTooltipTextsHorizontally": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "AlwaysUsePCBWithElectronBasedClients": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "AppleLanguages": {
+  "reason": "型別 array 不自動測",
+  "status": "skipped"
+ },
+ "AssociatedPhrasesEnabled": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "AutoCompositeWithLongestPossibleCassetteKey": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "AutoCorrectReadingCombination": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "BasicKeyboardLayout": {
+  "reason": "型別 string 不自動測",
+  "status": "skipped"
+ },
+ "BeepSoundPreference": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "0",
+   "1"
+  ]
+ },
+ "BypassNonAppleCapsLockHandling": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "CNS11643Enabled": {
+  "differing": {
+   "true": {
+    "first": [
+     "  ↓                    h=1 組字區「你好」@0 候選[0/1] 你好 妳好 好 郝 👌 👍 🙆 🙆‍♀️ 🙆‍♂️ 反白0",
+     "  ↓                    h=1 組字區「你好」@0 候選[0/4] 你好 妳好 好 郝 𠲡 𠻲 𤫧 󹆯 󽾯 反白0"
+    ],
+    "lines": 36
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "CandidateKeys": {
+  "reason": "型別 string 不自動測",
+  "status": "skipped"
+ },
+ "CandidateListTextSize": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "12",
+   "13",
+   "14",
+   "15",
+   "17",
+   "18"
+  ]
+ },
+ "CandidateNarrationToggleType": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "1",
+   "2"
+  ]
+ },
+ "CandidateServiceMenuContents": {
+  "reason": "型別 array 不自動測",
+  "status": "skipped"
+ },
+ "CandidateStateJKHLBehavior": {
+  "differing": {
+   "1": {
+    "first": [
+     "  l                      h=1 組字區「你」@0 候選[0/3] 你 妳 擬 禰 儗 旎 昵 坭 柅 反白0",
+     "  l                      h=1 組字區「妳」@0 候選[0/3] 你 妳 擬 禰 儗 旎 昵 坭 柅 反白1"
+    ],
+    "lines": 2
+   },
+   "2": {
+    "first": [
+     "  j                      h=1 組字區「你」@0 候選[0/3] 你 妳 擬 禰 儗 旎 昵 坭 柅 反白0",
+     "  j                      h=1 組字區「妳」@0 候選[0/3] 你 妳 擬 禰 儗 旎 昵 坭 柅 反白1"
+    ],
+    "lines": 1
+   }
+  },
+  "status": "effect",
+  "values": [
+   "1",
+   "2"
+  ]
+ },
+ "CandidateTextFontName": {
+  "reason": "型別 string 不自動測",
+  "status": "skipped"
+ },
+ "CandidateWindowShowOnlyOneLine": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "CassetteEnabled": {
+  "differing": {
+   "true": {
+    "first": [
+     "  su3cl3                 h=1 組字區「你好」@6",
+     "  su3cl3                 h=0 組字區「33」@2"
+    ],
+    "lines": 180
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "CassettePath": {
+  "reason": "型別 string 不自動測",
+  "status": "skipped"
+ },
+ "CheckAbusersOfSecureEventInputAPI": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "CheckUpdateAutomatically": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "ClassicHaninKeyboardSymbolModeShortcutEnabled": {
+  "differing": {
+   "true": {
+    "first": [
+     "  \\                      h=1 組字區「、」@3",
+     "  \\                      h=1 組字區「 」@0"
+    ],
+    "lines": 1
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "ClientsIMKTextInputIncapable": {
+  "reason": "型別 dict 不自動測",
+  "status": "skipped"
+ },
+ "ConsolidateContextOnCandidateSelection": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "CurrencyNumeralsEnabled": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "CursorBehaviorAfterConfirmingCandidate": {
+  "differing": {
+   "0": {
+    "first": [
+     "  2                      h=1 組字區「今天天氣」@12",
+     "  2                      h=1 組字區「今天天氣」@9"
+    ],
+    "lines": 4
+   },
+   "2": {
+    "first": [
+     "  2                      h=1 組字區「今天天氣」@12",
+     "  2                      h=1 組字區「今天天氣」@9"
+    ],
+    "lines": 4
+   }
+  },
+  "status": "effect",
+  "values": [
+   "0",
+   "2"
+  ]
+ },
+ "DeltaOfCalendarYears": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "-1999",
+   "-4000",
+   "1",
+   "0"
+  ]
+ },
+ "DisableSegmentedThickUnderlineInMarkingModeForManagedClients": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "DodgeInvalidEdgeCandidateCursorPosition": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "EnableCandidateWindowAnimation": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "EnableLatchedAlnumStateInMixedAlnumMode": {
+  "differing": {
+   "true": {
+    "first": [
+     "  sucl                   h=1 組字區「sucl」@4",
+     "    commit「suc」"
+    ],
+    "lines": 23
+   }
+  },
+  "prerequisites": [
+   [
+    "MixedAlphanumericalEnabled",
+    "true"
+   ]
+  ],
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "EnforceSingleLineCandidateWindowLayout4SCPC": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "EscToCleanInputBuffer": {
+  "differing": {
+   "false": {
+    "first": [
+     "  Esc                    h=1 組字區「」@0",
+     "    commit「你」"
+    ],
+    "lines": 212
+   }
+  },
+  "status": "effect",
+  "values": [
+   "false"
+  ]
+ },
+ "FetchSuggestionsFromPerceptionOverrideModel": {
+  "differing": {
+   "false": {
+    "first": [
+     "  su3cl3                 h=1 組字區「妳好」@6",
+     "  su3cl3                 h=1 組字區「你好」@6"
+    ],
+    "lines": 18
+   }
+  },
+  "status": "effect",
+  "values": [
+   "false"
+  ]
+ },
+ "FilterFactoryKanjisOfNonCurrentInputMode": {
+  "differing": {
+   "true": {
+    "first": [
+     "  Tab                    h=1 組字區「年中」@6 提示「2 / 23　年中」",
+     "  Tab                    h=1 組字區「年中」@6 提示「2 / 20　年中」"
+    ],
+    "lines": 16
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "FilterNonCNSReadingsForCHTInput": {
+  "differing": {},
+  "prerequisites": [
+   [
+    "CNS11643Enabled",
+    "true"
+   ]
+  ],
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "ForceCassetteChineseConversion": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "1",
+   "2",
+   "3"
+  ]
+ },
+ "FuriousTypingEnabled4Pinyin": {
+  "differing": {
+   "false": {
+    "first": [
+     "  su                     h=1 組字區「3蘇」@4 候選[0/7] 蘇 酥 訴 俗 素 速 溯 塑 粟 反白0",
+     "  su                     h=1 組字區「3su」@3"
+    ],
+    "lines": 50
+   }
+  },
+  "prerequisites": [
+   [
+    "PinyinTypingEnabled",
+    "true"
+   ]
+  ],
+  "status": "effect",
+  "values": [
+   "false"
+  ]
+ },
+ "FuriousTypingEnabled4Zhuyin": {
+  "differing": {
+   "true": {
+    "first": [
+     "  su3cl3                 h=1 組字區「妳好」@6",
+     "  su3cl3                 h=1 組字區「你好」@6"
+    ],
+    "lines": 28
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "HalfWidthPunctuationEnable": {
+  "differing": {
+   "true": {
+    "first": [
+     "  Shift+,                h=1 組字區「你，」@6",
+     "  Shift+,                h=1 組字區「你,」@4"
+    ],
+    "lines": 6
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "HardenVerticalPunctuations": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "InlineDumpPinyinInLieuOfZhuyin": {
+  "differing": {
+   "true": {
+    "first": [
+     "    commit「妳(ㄋㄧˇ)好(ㄏㄠˇ)」",
+     "    commit「妳(nǐ)好(hǎo)」"
+    ],
+    "lines": 1
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "KanjiConversionPreferences": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "1",
+   "2"
+  ]
+ },
+ "KeepReadingUponCompositionError": {
+  "differing": {
+   "true": {
+    "first": [
+     "  3su                    h=1 組字區「ㄧ」@3",
+     "  3su                    h=1 組字區「ㄋㄧ」@6"
+    ],
+    "lines": 7
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "KeyboardParser4Pinyin": {
+  "differing": {
+   "101": {
+    "first": [
+     "  Shift+,                h=1 組字區「〈」@3",
+     "  Shift+,                h=1 組字區「，」@3"
+    ],
+    "lines": 24
+   },
+   "102": {
+    "first": [
+     "  Shift+,                h=1 組字區「〈」@3",
+     "  Shift+,                h=1 組字區「，」@3"
+    ],
+    "lines": 24
+   },
+   "103": {
+    "first": [
+     "  Shift+,                h=1 組字區「〈」@3",
+     "  Shift+,                h=1 組字區「，」@3"
+    ],
+    "lines": 23
+   },
+   "104": {
+    "first": [
+     "  su3cl3                 h=1 組字區「3」@1",
+     "  su3cl3                 h=1 組字區「ㄑ3」@4"
+    ],
+    "lines": 46
+   },
+   "105": {
+    "first": [
+     "  Shift+,                h=1 組字區「〈」@3",
+     "  Shift+,                h=1 組字區「，」@3"
+    ],
+    "lines": 142
+   }
+  },
+  "prerequisites": [
+   [
+    "PinyinTypingEnabled",
+    "true"
+   ]
+  ],
+  "status": "effect",
+  "values": [
+   "101",
+   "102",
+   "103",
+   "104",
+   "105"
+  ]
+ },
+ "KeyboardParser4Zhuyin": {
+  "differing": {
+   "1": {
+    "first": [
+     "  su3cl3                 h=1 組字區「你好」@6",
+     "  su3cl3                 h=1 組字區「許」@3"
+    ],
+    "lines": 173
+   },
+   "4": {
+    "first": [
+     "  su3cl3                 h=1 組字區「你好」@6",
+     "  su3cl3                 h=1 組字區「ㄇㄨㄟ」@9"
+    ],
+    "lines": 190
+   },
+   "5": {
+    "first": [
+     "  su3cl3                 h=1 組字區「你好」@6",
+     "  su3cl3                 h=1 組字區「叟」@3"
+    ],
+    "lines": 112
+   },
+   "6": {
+    "first": [
+     "  su3cl3                 h=1 組字區「你好」@6",
+     "  su3cl3                 h=1 組字區「ㄉㄠ」@6"
+    ],
+    "lines": 198
+   },
+   "7": {
+    "first": [
+     "  su3cl3                 h=1 組字區「你好」@6",
+     "  su3cl3                 h=1 組字區「ㄏㄧㄠ」@9"
+    ],
+    "lines": 198
+   },
+   "8": {
+    "first": [
+     "  su3cl3                 h=1 組字區「你好」@6",
+     "  su3cl3                 h=1 組字區「ㄉㄠ」@6"
+    ],
+    "lines": 198
+   }
+  },
+  "status": "effect",
+  "values": [
+   "1",
+   "4",
+   "5",
+   "8",
+   "6",
+   "7"
+  ]
+ },
+ "MaxCandidateLength": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "11",
+   "20",
+   "1",
+   "0"
+  ]
+ },
+ "MinCellWidthForHorizontalMatrix": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "1"
+  ]
+ },
+ "MixedAlnumJudgeReadingsBySequentialRawKeyOrder": {
+  "differing": {},
+  "prerequisites": [
+   [
+    "MixedAlphanumericalEnabled",
+    "true"
+   ]
+  ],
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "MixedAlphanumericalEnabled": {
+  "differing": {
+   "true": {
+    "first": [
+     "  su                     h=1 組字區「妳好ㄋㄧ」@12",
+     "  su                     h=1 組字區「妳好su」@8 提示「ㄋㄧ」"
+    ],
+    "lines": 80
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "MostRecentInputMode": {
+  "reason": "型別 string 不自動測",
+  "status": "skipped"
+ },
+ "NumPadCharInputBehavior": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "1",
+   "2",
+   "3",
+   "4",
+   "5"
+  ]
+ },
+ "OverrideNotifyUIColorScheme": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "-1",
+   "1"
+  ]
+ },
+ "PhraseEditorAutoReloadExternalModifications": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "PhraseReplacementEnabled": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "PinyinTypingEnabled": {
+  "differing": {
+   "true": {
+    "first": [
+     "  su3cl3                 h=1 組字區「你好」@6",
+     "  su3cl3                 h=1 組字區「3」@1"
+    ],
+    "lines": 198
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "PopupCompositionBufferTextSize": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "19",
+   "20",
+   "21",
+   "22",
+   "23",
+   "24"
+  ]
+ },
+ "PreferredRevolverForceLevel": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "0",
+   "1"
+  ]
+ },
+ "ReadingNarrationCoverage": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "1",
+   "2"
+  ]
+ },
+ "ReducePOMLifetimeToNoMoreThan12Hours": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "ReflectBPMFVSInCompositionBuffer": {
+  "differing": {
+   "true": {
+    "first": [
+     "  5j/ jp6ek7x93          h=1 組字區「中文個」@9",
+     "  5j/ jp6ek7x93          h=1 組字區「中文個󠇡」@13"
+    ],
+    "lines": 3
+   }
+  },
+  "prerequisites": [
+   [
+    "SpecifyCmdOptCtrlEnterBehavior",
+    "4"
+   ]
+  ],
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "ReplaceSymbolMenuNodeWithUserSuppliedData": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "RespectClientAccentColor": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "RomanNumeralOutputFormat": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "1",
+   "2",
+   "3"
+  ]
+ },
+ "SecurityHardenedCompositionBuffer": {
+  "differing": {
+   "true": {
+    "first": [
+     "  su3cl3                 h=1 組字區「你好」@6",
+     "  su3cl3                 h=1 組字區「 」@0"
+    ],
+    "lines": 99
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "ShareAlphanumericalModeStatusAcrossClients": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "ShiftEisuToggleOffTogetherWithCapsLock": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "ShouldAutoReloadUserDataFiles": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "ShouldNotFartInLieuOfBeep": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "ShowCodePointInCandidateUI": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "ShowHanyuPinyinInCompositionBuffer": {
+  "differing": {
+   "true": {
+    "first": [
+     "  su                     h=1 組字區「妳好ㄋㄧ」@12",
+     "  su                     h=1 組字區「妳好ni」@8"
+    ],
+    "lines": 7
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "ShowModeDescriptionOnActivatingServer": {
+  "differing": {
+   "true": {
+    "first": [
+     "    commit「妳好」",
+     "  Enter                  h=0 組字區「妳好」@6"
+    ],
+    "lines": 195
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "ShowNotificationsWhenTogglingCapsLock": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "ShowNotificationsWhenTogglingEisu": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "ShowNotificationsWhenTogglingShift": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "ShowReverseLookupInCandidateUI": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "ShowTranslatedStrokesInCompositionBuffer": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "SpaceKeyBehaviorAgainstICB": {
+  "differing": {
+   "0": {
+    "first": [
+     "  Space                  h=1 組字區「妳好」@0 候選[0/1] 妳好 你好 好 郝 👌 👍 🙆 🙆‍♀️ 🙆‍♂️ 反白0",
+     "    commit「妳好」"
+    ],
+    "lines": 181
+   },
+   "2": {
+    "first": [
+     "  Space                  h=1 組字區「妳好」@0 候選[0/1] 妳好 你好 好 郝 👌 👍 🙆 🙆‍♀️ 🙆‍♂️ 反白0",
+     "  Space                  h=1 組字區「你好」@6 提示「1 / 9　你好」"
+    ],
+    "lines": 177
+   }
+  },
+  "status": "effect",
+  "values": [
+   "0",
+   "2"
+  ]
+ },
+ "SpecifyCmdOptCtrlEnterBehavior": {
+  "differing": {
+   "1": {
+    "first": [
+     "    commit「妳(ㄋㄧˇ)好(ㄏㄠˇ)」",
+     "    commit「<ruby>妳<rp>(</rp><rt>ㄋㄧˇ</rt><rp>)</rp></ruby><ruby>好<rp>(</rp><rt>ㄏㄠˇ</rt><rp>)</rp></ruby>」"
+    ],
+    "lines": 1
+   },
+   "2": {
+    "first": [
+     "    commit「妳(ㄋㄧˇ)好(ㄏㄠˇ)」",
+     "    commit「⠝⠡⠈⠗⠩⠈」"
+    ],
+    "lines": 1
+   },
+   "3": {
+    "first": [
+     "    commit「妳(ㄋㄧˇ)好(ㄏㄠˇ)」",
+     "    commit「⠝⠊⠄⠓⠖⠄」"
+    ],
+    "lines": 1
+   },
+   "4": {
+    "first": [
+     "    commit「妳(ㄋㄧˇ)好(ㄏㄠˇ)」",
+     "    commit「妳好」"
+    ],
+    "lines": 1
+   },
+   "5": {
+    "first": [
+     "    commit「妳(ㄋㄧˇ)好(ㄏㄠˇ)」",
+     "    commit「N*@R%@」"
+    ],
+    "lines": 1
+   },
+   "6": {
+    "first": [
+     "    commit「妳(ㄋㄧˇ)好(ㄏㄠˇ)」",
+     "    commit「NI'H6'」"
+    ],
+    "lines": 1
+   }
+  },
+  "status": "effect",
+  "values": [
+   "1",
+   "2",
+   "3",
+   "4",
+   "5",
+   "6"
+  ]
+ },
+ "SpecifyIntonationKeyBehavior": {
+  "differing": {
+   "2": {
+    "first": [
+     "  4（覆寫聲調）    h=1 組字區「膩」@3",
+     "  4（覆寫聲調）    h=1 組字區「你ˋ」@5"
+    ],
+    "lines": 2
+   }
+  },
+  "status": "effect",
+  "values": [
+   "1",
+   "2"
+  ]
+ },
+ "SpecifyShiftBackSpaceKeyBehavior": {
+  "differing": {
+   "1": {
+    "first": [
+     "  Shift+BackSpace        h=1 組字區「你ㄏㄠ」@9",
+     "  Shift+BackSpace        h=1 組字區「」@0"
+    ],
+    "lines": 2
+   },
+   "2": {
+    "first": [
+     "  Shift+BackSpace        h=1 組字區「你ㄏㄠ」@9",
+     "  Shift+BackSpace        h=1 組字區「」@0"
+    ],
+    "lines": 2
+   }
+  },
+  "status": "effect",
+  "values": [
+   "1",
+   "2"
+  ]
+ },
+ "SpecifyShiftSpaceKeyBehavior4CandidateWindow": {
+  "differing": {
+   "true": {
+    "first": [
+     "  Space                  h=1 組字區「你好」@0 候選[0/1] 妳好 你好 好 郝 👌 👍 🙆 🙆‍♀️ 🙆‍♂️ 反白1",
+     "  Space                  h=1 組字區「妳好」@0 候選[0/1] 妳好 你好 好 郝 👌 👍 🙆 🙆‍♀️ 🙆‍♂️ 反白0"
+    ],
+    "lines": 3
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "SpecifyShiftSpaceKeyBehavior4EmptyState": {
+  "differing": {
+   "true": {
+    "first": [
+     "    commit「　」",
+     "    commit「 」"
+    ],
+    "lines": 1
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "SpecifyShiftTabKeyBehavior": {
+  "differing": {
+   "true": {
+    "first": [
+     "  Tab                    h=1 組字區「年中」@6 提示「2 / 23　年中」",
+     "  Tab                    h=1 組字區「年終」@0 候選[0/3] 年終 年中 中 鐘 終 忠 鍾 衷 忪 反白0"
+    ],
+    "lines": 9
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "SuppressFactoryUnigramsOfKanaSyllables": {
+  "differing": {},
+  "prerequisites": [
+   [
+    "MixedAlphanumericalEnabled",
+    "true"
+   ]
+  ],
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "SuppressTooltipForIntonationKeyOverrideEvents": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "SymbolInputEnabled": {
+  "differing": {
+   "false": {
+    "first": [
+     "  ↓                    h=1 組字區「你好」@0 候選[0/1] 你好 妳好 好 郝 👌 👍 🙆 🙆‍♀️ 🙆‍♂️ 反白0",
+     "  ↓                    h=1 組字區「你好」@0 候選[0/1] 你好 妳好 好 郝 反白0"
+    ],
+    "lines": 6
+   }
+  },
+  "status": "effect",
+  "values": [
+   "false"
+  ]
+ },
+ "TogglingAlphanumericalModeWithLShift": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "TogglingAlphanumericalModeWithRShift": {
+  "differing": {
+   "false": {
+    "first": [
+     "  toggle → 1",
+     "  toggle → -1"
+    ],
+    "lines": 2
+   }
+  },
+  "status": "effect",
+  "values": [
+   "false"
+  ]
+ },
+ "TrimUnfinishedReadingsOnCommit": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "UpperCaseLetterKeyBehavior": {
+  "differing": {
+   "1": {
+    "first": [
+     "  Shift+A                h=1 組字區「你A」@4",
+     "    commit「你a」"
+    ],
+    "lines": 83
+   },
+   "2": {
+    "first": [
+     "  Shift+A                h=1 組字區「你A」@4",
+     "    commit「你A」"
+    ],
+    "lines": 83
+   },
+   "3": {
+    "first": [
+     "  Shift+A（空）       h=1 組字區「A」@1",
+     "    commit「a」"
+    ],
+    "lines": 79
+   },
+   "4": {
+    "first": [
+     "  Shift+A（空）       h=1 組字區「A」@1",
+     "    commit「A」"
+    ],
+    "lines": 79
+   }
+  },
+  "status": "effect",
+  "values": [
+   "1",
+   "2",
+   "3",
+   "4"
+  ]
+ },
+ "UseDynamicCandidateWindowOrigin": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "UseExternalFactoryDict": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "UseFixedCandidateOrderOnSelection": {
+  "differing": {
+   "true": {
+    "first": [
+     "  Space                  h=1 組字區「妳好」@0 候選[0/1] 妳好 你好 好 郝 👌 👍 🙆 🙆‍♀️ 🙆‍♂️ 反白0",
+     "  Space                  h=1 組字區「妳好」@0 候選[0/1] 你好 妳好 好 郝 👌 👍 🙆 🙆‍♀️ 🙆‍♂️ 反白0"
+    ],
+    "lines": 3
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "UseHorizontalCandidateList": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "UseRearCursorMode": {
+  "differing": {
+   "true": {
+    "first": [
+     "  ↓                    h=1 組字區「你好」@0 候選[0/1] 你好 妳好 好 郝 👌 👍 🙆 🙆‍♀️ 🙆‍♂️ 反白0",
+     "  ↓                    h=1 組字區「你好」@3 候選[0/1] 好 郝 👌 👍 🙆 🙆‍♀️ 🙆‍♂️ 反白0"
+    ],
+    "lines": 33
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "UseSCPCTypingMode": {
+  "differing": {
+   "true": {
+    "first": [
+     "  su3cl3                 h=1 組字區「你好」@6",
+     "    commit「你」"
+    ],
+    "lines": 223
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "UseShiftQuestionToCallServiceMenu": {
+  "differing": {
+   "false": {
+    "first": [
+     "    commit「你」",
+     "  Shift+?                h=1 組字區「你」@0 候選[0/3] 你 妳 擬 禰 儗 旎 昵 坭 柅 反白0"
+    ],
+    "lines": 104
+   }
+  },
+  "status": "effect",
+  "values": [
+   "false"
+  ]
+ },
+ "UseSpaceToCommitHighlightedCandidate4SCPC": {
+  "differing": {
+   "true": {
+    "first": [
+     "  Space                  h=1 組字區「好」@0 候選[0/1] 好 郝 👌 👍 🙆 🙆‍♀️ 🙆‍♂️ 反白0",
+     "    commit「好」"
+    ],
+    "lines": 194
+   }
+  },
+  "prerequisites": [
+   [
+    "UseSCPCTypingMode",
+    "true"
+   ]
+  ],
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "UserDataFolderSpecified": {
+  "reason": "型別 string 不自動測",
+  "status": "skipped"
+ },
+ "UserPhrasesDatabaseBypassed": {
+  "differing": {
+   "true": {
+    "first": [
+     "  ↓                    h=1 組字區「你好」@0 候選[0/1] 你好 妳好 好 郝 👌 👍 🙆 🙆‍♀️ 🙆‍♂️ 反白0",
+     "  ↓                    h=1 組字區「你好」@0 候選[0/1] 你好 妳好 好 郝 反白0"
+    ],
+    "lines": 6
+   }
+  },
+  "status": "effect",
+  "values": [
+   "true"
+  ]
+ },
+ "UsingHotKeyAssociates": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "UsingHotKeyCNS": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "UsingHotKeyCassette": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "UsingHotKeyCurrencyNumerals": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "UsingHotKeyHalfWidthPunctuation": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "UsingHotKeyInputMode": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "UsingHotKeyKanjiConversionMode": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "UsingHotKeyPinyinZhuyinTypingSwitch": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "UsingHotKeyRevLookup": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "UsingHotKeySCPC": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "false"
+  ]
+ },
+ "_DebugMode": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "_FailureFlag_POMObservation": {
+  "differing": {},
+  "status": "no-difference",
+  "values": [
+   "true"
+  ]
+ },
+ "enforceETenDOSCandidateSequence": {
+  "differing": {
+   "false": {
+    "first": [
+     "  ↓                    h=1 組字區「年終」@0 候選[0/3] 年終 年中 中 鐘 終 忠 鍾 衷 忪 反白0",
+     "  ↓                    h=1 組字區「年終」@0 候選[0/3] 年終 年中 中 終 鐘 鍾 忠 盅 衷 反白0"
+    ],
+    "lines": 27
+   }
+  },
+  "status": "effect",
+  "values": [
+   "false"
+  ]
+ }
+}

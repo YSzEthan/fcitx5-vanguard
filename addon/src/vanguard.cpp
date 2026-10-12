@@ -385,7 +385,8 @@ private:
             // fcitx5 的選字視窗沒有頁碼欄位，只能放在輔助文字列。
             std::string footer = std::to_string(vg_candidate_page_index() + 1) + "/" +
                                  std::to_string(vg_candidate_page_count());
-            if (highlighted >= 0) {
+            // 碼位要不要顯示，跟著引擎的偏好設定 ShowCodePointInCandidateUI。
+            if (highlighted >= 0 && prefBool("ShowCodePointInCandidateUI")) {
                 const std::string codePoint = codePointLabel(takeString(vg_candidate_text(highlighted)));
                 if (!codePoint.empty()) footer += "  " + codePoint;
             }

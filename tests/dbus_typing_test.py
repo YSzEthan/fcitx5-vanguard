@@ -423,7 +423,7 @@ def main():
         report.equal("分頁表、翻譯表跟引擎的設定對得起來", code, 0)
         code, output, _error = settings("--list")
         listed = [line.split("\t") for line in output.splitlines()]
-        report.equal("列得出 82 項（引擎 119 項，扣掉不顯示的無作用項目 37 項）", (code, len(listed)), (0, 82))
+        report.equal("列得出 62 項（引擎 119 項，扣掉不顯示的無作用項目 57 項）", (code, len(listed)), (0, 62))
         report.check("每一項都有分頁與標題", all(len(line) == 5 and line[0] != "？" and line[4] for line in listed))
         report.equal("讀一項", settings("--get", "CandidateKeys")[:2], (0, "123456789"))
         report.equal("寫整數選項", settings("--set", "SpaceKeyBehaviorAgainstICB=0")[0], 0)
@@ -441,6 +441,13 @@ def main():
         report.equal("寫字串陣列（JSON）；隱藏的項目指定 key 仍可讀寫", settings("--set", 'AppleLanguages=["zh-Hant"]')[0], 0)
         report.equal("讀回來", settings("--get", "AppleLanguages")[1], '["zh-Hant"]')
         settings("--set", "AppleLanguages=[]")
+        settings("--set", "ShowCodePointInCandidateUI=false")
+        client.type("su3")
+        client.key(KEY_DOWN)
+        report.check("關掉碼位顯示後，選字視窗附註只剩頁碼", re.fullmatch(r"1/\d+", client.aux_down) is not None, repr(client.aux_down))
+        client.key(KEY_ESCAPE)
+        client.key(KEY_ESCAPE)
+        settings("--set", "ShowCodePointInCandidateUI=true")
 
         if os.environ.get("VANGUARD_TEST_GUI"):
             # 沒有螢幕：用 GTK 的 broadway 後端把視窗建起來，確認每一項設定都有一列。
@@ -452,7 +459,7 @@ def main():
                 shots = os.environ.get("VANGUARD_TEST_SCREENSHOTS")
                 code, output, error = settings("--self-test", *(["--screenshot", shots] if shots else []), env=gui_env)
                 print("    " + output.replace("\n", "\n    "))
-                report.check("視窗建得起來，顯示的 82 項各有一列", code == 0, error[-300:])
+                report.check("視窗建得起來，顯示的 62 項各有一列", code == 0, error[-300:])
             finally:
                 broadway.terminate()
         else:

@@ -17,7 +17,7 @@
   fcitx5-vanguard-settings --set KEY=VALUE
   fcitx5-vanguard-settings --check      檢查分頁表與翻譯表有沒有漏掉引擎的設定
 
-引擎共 119 項設定，其中 37 項在這個版本沒有作用（26 項 macOS 專用、11 項沒有接上），不顯示（見 HIDDEN）。
+引擎共 119 項設定，其中 57 項在這個版本沒有作用（26 項 macOS 專用、31 項沒有接上），不顯示（見 HIDDEN）。
 """
 import argparse
 import json
@@ -47,7 +47,7 @@ PAGES = [
         "ShowHanyuPinyinInCompositionBuffer", "TrimUnfinishedReadingsOnCommit", "EscToCleanInputBuffer",
     ]),
     ("keys", "按鍵行為", "個別按鍵在組字時做什麼。", [
-        "SpaceKeyBehaviorAgainstICB", "UpperCaseLetterKeyBehavior", "NumPadCharInputBehavior",
+        "SpaceKeyBehaviorAgainstICB", "UpperCaseLetterKeyBehavior",
         "SpecifyIntonationKeyBehavior",
         "SpecifyShiftBackSpaceKeyBehavior", "SpecifyShiftTabKeyBehavior",
         "SpecifyShiftSpaceKeyBehavior4CandidateWindow", "SpecifyShiftSpaceKeyBehavior4EmptyState",
@@ -66,7 +66,7 @@ PAGES = [
         "CandidateStateJKHLBehavior", "UseShiftQuestionToCallServiceMenu",
         "ConsolidateContextOnCandidateSelection", "PreferredRevolverForceLevel",
         "UseFixedCandidateOrderOnSelection", "enforceETenDOSCandidateSequence",
-        "UseSpaceToCommitHighlightedCandidate4SCPC", "AlsoConfirmAssociatedCandidatesByEnter",
+        "UseSpaceToCommitHighlightedCandidate4SCPC",
         "ShowCodePointInCandidateUI",
         "AllowRescoringSingleKanjiCandidates", "MaxCandidateLength", "CandidateServiceMenuContents",
     ]),
@@ -78,20 +78,9 @@ PAGES = [
     ]),
     ("lexicon", "辭典與記憶", "使用者語彙、選字記憶與相關的資料檔。", [
         "FetchSuggestionsFromPerceptionOverrideModel", "ReducePOMLifetimeToNoMoreThan12Hours",
-        "AssociatedPhrasesEnabled", "PhraseReplacementEnabled", "UserPhrasesDatabaseBypassed",
-        "ReplaceSymbolMenuNodeWithUserSuppliedData",
+        "PhraseReplacementEnabled", "UserPhrasesDatabaseBypassed",
     ]),
-    ("cassette", "磁帶模式", "用 CIN 表格檔擴充其他輸入法（倉頡、嘸蝦米等）。", [
-        "CassetteEnabled", "CassettePath", "ShowTranslatedStrokesInCompositionBuffer",
-        "ForceCassetteChineseConversion", "AutoCompositeWithLongestPossibleCassetteKey",
-    ]),
-    ("hotkeys", "熱鍵", "要不要啟用引擎內建的功能切換熱鍵。這些熱鍵在 macOS 版是 Ctrl+Command+字母，"
-     "Linux 鍵盤沒有 Command 鍵，實際按不按得出來沒有驗證過。", [
-        "UsingHotKeySCPC", "UsingHotKeyAssociates", "UsingHotKeyCNS", "UsingHotKeyKanjiConversionMode",
-        "UsingHotKeyPinyinZhuyinTypingSwitch", "UsingHotKeyHalfWidthPunctuation",
-        "UsingHotKeyCurrencyNumerals", "UsingHotKeyCassette", "UsingHotKeyRevLookup", "UsingHotKeyInputMode",
-    ]),
-    ("debug", "偵錯", "開發與除錯用。", ["_DebugMode", "_FailureFlag_POMObservation"]),
+    ("debug", "偵錯", "開發與除錯用。", ["_DebugMode", ]),
 ]
 
 # macOS 專用的設定：管的是 macOS 版自己畫的視窗、音效、系統整合等，這個版本沒有對應的東西，
@@ -140,6 +129,26 @@ HIDDEN_NOT_WIRED = {
     "SuppressTooltipForIntonationKeyOverrideEvents": "該提示在這個版本本來就顯示不出來。",
     "ShowReverseLookupInCandidateUI": "這個版本的選字視窗沒有顯示反查結果的欄位。",
     "HardenVerticalPunctuations": "這個版本沒有縱排輸入。",
+    "CassetteEnabled": "這個版本沒有接上磁帶檔的載入；打開磁帶模式卻沒有資料會打不出字。",
+    "CassettePath": "這個版本沒有接上磁帶檔的載入；打開磁帶模式卻沒有資料會打不出字。",
+    "ShowTranslatedStrokesInCompositionBuffer": "這個版本沒有接上磁帶檔的載入；打開磁帶模式卻沒有資料會打不出字。",
+    "ForceCassetteChineseConversion": "這個版本沒有接上磁帶檔的載入；打開磁帶模式卻沒有資料會打不出字。",
+    "AutoCompositeWithLongestPossibleCassetteKey": "這個版本沒有接上磁帶檔的載入；打開磁帶模式卻沒有資料會打不出字。",
+    "UsingHotKeySCPC": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
+    "UsingHotKeyAssociates": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
+    "UsingHotKeyCNS": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
+    "UsingHotKeyKanjiConversionMode": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
+    "UsingHotKeyPinyinZhuyinTypingSwitch": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
+    "UsingHotKeyHalfWidthPunctuation": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
+    "UsingHotKeyCurrencyNumerals": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
+    "UsingHotKeyCassette": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
+    "UsingHotKeyRevLookup": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
+    "UsingHotKeyInputMode": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
+    "NumPadCharInputBehavior": "數字小鍵盤的按鍵在這個版本沒有正確傳給引擎，實測改了沒有差異。",
+    "ReplaceSymbolMenuNodeWithUserSuppliedData": "這個版本沒有接上使用者的 symbols.dat，符號選單的內容是內建的。",
+    "AssociatedPhrasesEnabled": "關聯詞語的資料沒有載入，實測打開後沒有差異。",
+    "AlsoConfirmAssociatedCandidatesByEnter": "同上，關聯詞語在這個版本沒有作用。",
+    "_FailureFlag_POMObservation": "引擎內部自己設的旗標，不是給使用者調的。",
 }
 HIDDEN += list(HIDDEN_NOT_WIRED)
 
@@ -163,12 +172,26 @@ EXTRA_OPTIONS = {
     ],
 }
 
-# 在這個版本實際驗證過有作用的（自動測試或手動量測過）。
+# 在這個版本實際驗證過有作用的：改了值之後，同一組打字情境的結果確實不一樣
+# （tests/prefs_effect/compare.py 的比對結果，加上打字測試與手動量測確認過的幾項）。
+# 沒列在這裡、也沒被隱藏的，是那組情境測不出差異、但引擎的程式碼有讀取的設定。
 VERIFIED = {
-    "UseHorizontalCandidateList", "CandidateKeys", "MixedAlphanumericalEnabled",
-    "TogglingAlphanumericalModeWithLShift", "TogglingAlphanumericalModeWithRShift",
-    "ShowNotificationsWhenTogglingShift", "UpperCaseLetterKeyBehavior", "BypassNonAppleCapsLockHandling",
-    "SpaceKeyBehaviorAgainstICB", "KeyboardParser4Zhuyin",
+    "AcceptLeadingIntonations", "BypassNonAppleCapsLockHandling", "CNS11643Enabled", "CandidateKeys",
+    "CandidateStateJKHLBehavior", "ClassicHaninKeyboardSymbolModeShortcutEnabled",
+    "CursorBehaviorAfterConfirmingCandidate", "EnableLatchedAlnumStateInMixedAlnumMode",
+    "EscToCleanInputBuffer", "FetchSuggestionsFromPerceptionOverrideModel",
+    "FilterFactoryKanjisOfNonCurrentInputMode", "FuriousTypingEnabled4Pinyin", "FuriousTypingEnabled4Zhuyin",
+    "HalfWidthPunctuationEnable", "InlineDumpPinyinInLieuOfZhuyin", "KeepReadingUponCompositionError",
+    "KeyboardParser4Pinyin", "KeyboardParser4Zhuyin", "MixedAlphanumericalEnabled", "PinyinTypingEnabled",
+    "ReflectBPMFVSInCompositionBuffer", "ShowCodePointInCandidateUI", "ShowHanyuPinyinInCompositionBuffer",
+    "ShowNotificationsWhenTogglingShift", "SpaceKeyBehaviorAgainstICB", "SpecifyCmdOptCtrlEnterBehavior",
+    "SpecifyIntonationKeyBehavior", "SpecifyShiftBackSpaceKeyBehavior",
+    "SpecifyShiftSpaceKeyBehavior4CandidateWindow", "SpecifyShiftSpaceKeyBehavior4EmptyState",
+    "SpecifyShiftTabKeyBehavior", "SymbolInputEnabled", "TogglingAlphanumericalModeWithLShift",
+    "TogglingAlphanumericalModeWithRShift", "UpperCaseLetterKeyBehavior", "UseFixedCandidateOrderOnSelection",
+    "UseHorizontalCandidateList", "UseRearCursorMode", "UseSCPCTypingMode",
+    "UseShiftQuestionToCallServiceMenu", "UseSpaceToCommitHighlightedCandidate4SCPC",
+    "UserPhrasesDatabaseBypassed", "enforceETenDOSCandidateSequence",
 }
 
 PRODUCT_NAME_PATTERN = re.compile("唯音輸入法|唯音")
