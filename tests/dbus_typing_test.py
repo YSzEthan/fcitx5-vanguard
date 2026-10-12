@@ -408,7 +408,10 @@ def main():
         client.key(KEY_ESCAPE)
 
         print("17. 獨立設定程式（settings/fcitx5-vanguard-settings）：經 DBus 讀寫引擎全部的偏好設定")
-        tool = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "settings", "fcitx5-vanguard-settings")
+        # 測已安裝的套件時用裝進系統的那一支，否則用原始碼樹裡的。
+        tool = os.environ.get("VANGUARD_SETTINGS_TOOL") or os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "settings", "fcitx5-vanguard-settings")
+        print(f"    受測的設定程式：{tool}")
 
         def settings(*arguments, **extra):
             result = subprocess.run([sys.executable, tool, *arguments], capture_output=True, text=True,

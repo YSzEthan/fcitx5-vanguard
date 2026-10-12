@@ -24,7 +24,9 @@ if [ "$1" = "--system" ]; then
   PREFS_HOST="$ROOT/dist/prefs_host"
   ADDON_DIRS=
   DATA_DIRS=
+  SETTINGS_TOOL=/usr/bin/fcitx5-vanguard-settings
 else
+  SETTINGS_TOOL=
   ./packaging/stage-engine.sh | tail -2
   PREFIX="$ROOT/addon/prefix"
   LIBDIR="$PREFIX/lib"
@@ -84,6 +86,7 @@ env -i \
   ${ADDON_DIRS:+FCITX_ADDON_DIRS="$ADDON_DIRS"} \
   FCITX5_LOG="$SANDBOX/fcitx5.log" \
   ${GUI:+VANGUARD_TEST_GUI=1} \
+  ${SETTINGS_TOOL:+VANGUARD_SETTINGS_TOOL="$SETTINGS_TOOL"} \
   ${GUI:+VANGUARD_TEST_SCREENSHOTS="$WORK/screenshots/settings"} \
   dbus-run-session -- python3 "$ROOT/tests/dbus_typing_test.py" "$@" || STATUS=1
 exit $STATUS
