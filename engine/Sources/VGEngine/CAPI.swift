@@ -45,7 +45,8 @@ nonisolated public func vgInit(
   return mainSync {
     guard Engine.shared == nil else { return 3 }
     guard FileManager.default.isReadableFile(atPath: path) else { return 1 }
-    guard UserData.wireUp(folder: folder) else { return 2 }
+    let dataDirectory = URL(fileURLWithPath: path).deletingLastPathComponent()
+    guard UserData.wireUp(folder: folder, templates: dataDirectory.appendingPathComponent("templates")) else { return 2 }
 
     // 注音變體選字符的資料表跟辭庫裝在同一個目錄。引擎預設是從宿主執行檔旁邊找，
     // 在 fcitx5 裡那是 /usr/bin，找不到；所以這裡明確指定。沒有這個檔時引擎會原樣輸出、不轉換。
@@ -142,13 +143,7 @@ nonisolated public func vgKeyDown(_ keySym: UInt32, _ keyStates: UInt32) -> Int3
     guard let engine = Engine.shared, let session = engine.session else { return 0 }
     // 模式切換的提示看到下一個按鍵為止。
     engine.ui.status.hide()
-    // 上游對照表只收大寫字母的 keysym（0x41–0x5A），fcitx5 沒按 Shift 時給的是小寫。
-    var normalized = (0x61 ... 0x7A).contains(keySym) ? keySym - 0x20 : keySym
-    // 按著 Shift 時 fcitx5 給的是換檔後的符號（例如 Shift+, 給「<」），上游對照表只認實體鍵
-    // 本身的符號加 Shift 旗標。這裡照美式鍵盤換回去；大千等注音排列本來就以美式鍵位為準。
-    if keyStates & 1 != 0, let base = shiftedSymbolBase[keySym] { normalized = base }
-    guard let event = KBEvent(fcitxKeyCode: normalized, fcitxModifierFlags: keyStates, isKeyDown: true)
-    else { return 0 }
+    guard let event = makeKeyEvent(keySym: keySym, keyStates: keyStates) else { return 0 }
     let handled = session.handleEvent(event)
     // 保險：選單型的狀態如果沒有任何候選字，引擎會把之後所有按鍵都吃掉而且出不來。
     if session.state.type == .ofSymbolTable, session.state.candidates.isEmpty {
@@ -157,6 +152,54 @@ nonisolated public func vgKeyDown(_ keySym: UInt32, _ keyStates: UInt32) -> Int3
     return handled ? 1 : 0
   }
 }
+
+/// 把 fcitx5 的按鍵（X11 keysym 加修飾鍵狀態）轉成引擎的按鍵事件。
+/// 大部分交給上游的 `KBEvent(fcitxKeyCode:)`，但它的對照表有幾處跟實際的 keysym 對不上，先在這裡修正。
+@MainActor
+private func makeKeyEvent(keySym: UInt32, keyStates: UInt32) -> KBEvent? {
+  // 數字小鍵盤：上游的表把 KP_1…KP_9 的 keysym（0xFFB1 起）對到 F1…F12 的鍵碼，小鍵盤完全不能用。
+  // 這裡直接用 macOS 的小鍵盤鍵碼建立事件，並帶上引擎用來辨認小鍵盤的旗標。
+  if let pad = numericPadKeys[keySym] {
+    var flags: KBEvent.ModifierFlags = [.numericPad]
+    if keyStates & 1 != 0 { flags.insert(.shift) }
+    if keyStates & 2 != 0 { flags.insert(.capsLock) }
+    if keyStates & 4 != 0 { flags.insert(.control) }
+    if keyStates & 8 != 0 { flags.insert(.option) }
+    return KBEvent(
+      with: .keyDown, modifierFlags: flags, characters: pad.text,
+      charactersIgnoringModifiers: pad.text, isARepeat: false, keyCode: pad.keyCode
+    )
+  }
+  var normalized = keySym
+  if (0x61 ... 0x7A).contains(keySym) {
+    // 上游的表只收大寫字母的 keysym（0x41–0x5A），fcitx5 沒按 Shift 時給的是小寫。
+    normalized = keySym - 0x20
+  } else if (0xFFBE ... 0xFFC9).contains(keySym) {
+    // F1…F12 的 keysym 是 0xFFBE 起；上游的表把它們的鍵碼放在 0xFFB1 起（就是上面被佔走的那一段）。
+    normalized = keySym - 0xFFBE + 0xFFB1
+  } else if let navigation = numLockOffPadKeys[keySym] {
+    // Num Lock 關著時小鍵盤送的是方向鍵那一組，當成一般的方向鍵。
+    normalized = navigation
+  } else if keyStates & 1 != 0, let base = shiftedSymbolBase[keySym] {
+    // 按著 Shift 時 fcitx5 給的是換檔後的符號（例如 Shift+, 給「<」），上游的表只認實體鍵
+    // 本身的符號加 Shift 旗標。這裡照美式鍵盤換回去；大千等注音排列本來就以美式鍵位為準。
+    normalized = base
+  }
+  return KBEvent(fcitxKeyCode: normalized, fcitxModifierFlags: keyStates, isKeyDown: true)
+}
+
+/// 小鍵盤的 keysym 對到 macOS 的鍵碼與它打出來的字元。
+nonisolated private let numericPadKeys: [UInt32: (keyCode: UInt16, text: String)] = [
+  0xFFB0: (82, "0"), 0xFFB1: (83, "1"), 0xFFB2: (84, "2"), 0xFFB3: (85, "3"), 0xFFB4: (86, "4"),
+  0xFFB5: (87, "5"), 0xFFB6: (88, "6"), 0xFFB7: (89, "7"), 0xFFB8: (91, "8"), 0xFFB9: (92, "9"),
+  0xFFAE: (65, "."), 0xFFAA: (67, "*"), 0xFFAB: (69, "+"), 0xFFAD: (78, "-"), 0xFFAF: (75, "/"),
+]
+
+/// Num Lock 關著時小鍵盤送出的 keysym 對到一般的方向鍵 keysym。
+nonisolated private let numLockOffPadKeys: [UInt32: UInt32] = [
+  0xFF95: 0xFF50, 0xFF96: 0xFF51, 0xFF97: 0xFF52, 0xFF98: 0xFF53, 0xFF99: 0xFF54,
+  0xFF9A: 0xFF55, 0xFF9B: 0xFF56, 0xFF9C: 0xFF57, 0xFF9F: 0xFFFF,
+]
 
 /// 美式鍵盤上「Shift 之後的符號」對回「實體鍵本身的符號」。
 nonisolated private let shiftedSymbolBase: [UInt32: UInt32] = {
@@ -382,6 +425,10 @@ nonisolated public func vgPrefSet(_ key: UnsafePointer<CChar>, _ value: UnsafePo
     // 引擎自己的檢查：不合理的值（例如空的選字鍵）會被改回預設。
     PrefMgr.sharedSansDidSetOps.fixOddPreferencesCore()
     defaults.synchronize()
+    // 這一項如果牽涉資料檔（磁帶、關聯詞語、置換表），跟著載入。
+    if let message = UserData.preferenceChanged(key) {
+      Engine.shared?.ui.status.show(message, seconds: 4)
+    }
     // 讓語言模型與鍵盤排列跟上新的設定，並丟掉打到一半的內容。
     SessionHost.shared.syncLMPrefs()
     Engine.shared?.session?.switchState(.ofAbortion())

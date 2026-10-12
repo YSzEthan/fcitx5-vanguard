@@ -43,6 +43,8 @@ def run(binary, home, *arguments):
     return result.returncode, [line for line in result.stdout.splitlines() if "vChewingDebug" not in line]
 
 
+CASSETTE = os.path.join(ROOT, "vendor", "vChewing-LibVanguard", "Sources", "LXAssemblyMaterials4Tests", "Resources", "wubi.cin")
+
 # 有些設定要另一項先打開才看得出作用。這種的基準也要帶著同樣的前提，才是公平的比對。
 PREREQUISITES = {
     "KeyboardParser4Pinyin": [("PinyinTypingEnabled", "true")],
@@ -52,8 +54,13 @@ PREREQUISITES = {
     "SuppressFactoryUnigramsOfKanaSyllables": [("MixedAlphanumericalEnabled", "true")],
     "UseSpaceToCommitHighlightedCandidate4SCPC": [("UseSCPCTypingMode", "true")],
     "ReflectBPMFVSInCompositionBuffer": [("SpecifyCmdOptCtrlEnterBehavior", "4")],
-    "AlsoConfirmAssociatedCandidatesByEnter": [("AssociatedPhrasesEnabled", "true")],
     "FilterNonCNSReadingsForCHTInput": [("CNS11643Enabled", "true")],
+    "AlsoConfirmAssociatedCandidatesByEnter": [("AssociatedPhrasesEnabled", "true")],
+    # 磁帶模式要有磁帶檔才打得出字；用上游測試附的五筆表格。
+    "CassetteEnabled": [("CassettePath", CASSETTE)],
+    "ShowTranslatedStrokesInCompositionBuffer": [("CassettePath", CASSETTE), ("CassetteEnabled", "true")],
+    "ForceCassetteChineseConversion": [("CassettePath", CASSETTE), ("CassetteEnabled", "true")],
+    "AutoCompositeWithLongestPossibleCassetteKey": [("CassettePath", CASSETTE), ("CassetteEnabled", "true")],
 }
 
 

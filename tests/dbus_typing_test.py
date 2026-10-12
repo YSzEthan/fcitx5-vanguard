@@ -423,7 +423,7 @@ def main():
         report.equal("分頁表、翻譯表跟引擎的設定對得起來", code, 0)
         code, output, _error = settings("--list")
         listed = [line.split("\t") for line in output.splitlines()]
-        report.equal("列得出 62 項（引擎 119 項，扣掉不顯示的無作用項目 57 項）", (code, len(listed)), (0, 62))
+        report.equal("列得出 69 項（引擎 119 項，扣掉不顯示的無作用項目 50 項）", (code, len(listed)), (0, 69))
         report.check("每一項都有分頁與標題", all(len(line) == 5 and line[0] != "？" and line[4] for line in listed))
         report.equal("讀一項", settings("--get", "CandidateKeys")[:2], (0, "123456789"))
         report.equal("寫整數選項", settings("--set", "SpaceKeyBehaviorAgainstICB=0")[0], 0)
@@ -449,6 +449,58 @@ def main():
         client.key(KEY_ESCAPE)
         settings("--set", "ShowCodePointInCandidateUI=true")
 
+        print("    數字小鍵盤")
+        before = len(client.commits)
+        report.equal("空的時候按小鍵盤的 1：直接送出半形的 1", (client.key(0xFFB1), client.commits[before:]), (True, ["1"]))
+        settings("--set", "NumPadCharInputBehavior=1")
+        client.key(0xFFB2)
+        report.equal("改成全形之後按小鍵盤的 2", client.commits[before:], ["1", "２"])
+        settings("--set", "NumPadCharInputBehavior=0")
+
+        print("    關聯詞語：Shift+Enter 送出之後列出常接在後面的詞")
+        settings("--set", "AssociatedPhrasesEnabled=true")
+        before = len(client.commits)
+        client.type("su3cl3")
+        client.key(KEY_RETURN, STATE_SHIFT)
+        associates = candidate_texts(client)
+        print(f"    送出 {client.commits[before:]} 之後的關聯詞語 {associates[:6]}")
+        report.check("有列出關聯詞語", len(associates) > 0 and len(client.commits) == before + 1)
+        client.key(ord("1"), STATE_SHIFT)
+        client.key(KEY_ESCAPE)
+        client.key(KEY_ESCAPE)
+        settings("--set", "AssociatedPhrasesEnabled=false")
+        client.type("su3cl3")
+        client.key(KEY_RETURN, STATE_SHIFT)
+        report.equal("關掉之後就沒有", candidate_texts(client), [])
+        client.key(KEY_ESCAPE)
+
+        print("    磁帶模式")
+        cassette = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "vendor", "vChewing-LibVanguard",
+                                "Sources", "LXAssemblyMaterials4Tests", "Resources", "wubi.cin")
+        settings("--set", "CassettePath=/nonexistent/file.cin")
+        settings("--set", "CassetteEnabled=true")
+        report.equal("磁帶檔讀不到時，磁帶模式會被自動關掉", settings("--get", "CassetteEnabled")[1], "false")
+        client.type("su3")
+        report.equal("所以還是能正常打注音", client.preedit, "你")
+        client.key(KEY_ESCAPE)
+        if os.path.exists(cassette):
+            settings("--set", f"CassettePath={os.path.abspath(cassette)}")
+            settings("--set", "CassetteEnabled=true")
+            report.equal("指定讀得到的磁帶檔之後可以啟用", settings("--get", "CassetteEnabled")[1], "true")
+            client.settle(0.5)
+            client.type("su3cl3")
+            report.equal("用五筆的表格打字（跟比對工具量到的結果一致）", client.preedit, "田")
+            client.key(KEY_ESCAPE)
+            client.key(KEY_ESCAPE)
+            settings("--set", "CassetteEnabled=false")
+            client.settle(0.3)
+            client.type("su3")
+            report.equal("關掉磁帶模式後回到注音", client.preedit, "你")
+            client.key(KEY_ESCAPE)
+        else:
+            print("    （這個環境沒有上游的測試磁帶檔，跳過實際載入的部分）")
+        settings("--set", "CassettePath=")
+
         if os.environ.get("VANGUARD_TEST_GUI"):
             # 沒有螢幕：用 GTK 的 broadway 後端把視窗建起來，確認每一項設定都有一列。
             display = ":7"
@@ -459,7 +511,7 @@ def main():
                 shots = os.environ.get("VANGUARD_TEST_SCREENSHOTS")
                 code, output, error = settings("--self-test", *(["--screenshot", shots] if shots else []), env=gui_env)
                 print("    " + output.replace("\n", "\n    "))
-                report.check("視窗建得起來，顯示的 62 項各有一列", code == 0, error[-300:])
+                report.check("視窗建得起來，顯示的 69 項各有一列", code == 0, error[-300:])
             finally:
                 broadway.terminate()
         else:

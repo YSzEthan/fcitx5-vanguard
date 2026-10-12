@@ -17,7 +17,7 @@
   fcitx5-vanguard-settings --set KEY=VALUE
   fcitx5-vanguard-settings --check      檢查分頁表與翻譯表有沒有漏掉引擎的設定
 
-引擎共 119 項設定，其中 57 項在這個版本沒有作用（26 項 macOS 專用、31 項沒有接上），不顯示（見 HIDDEN）。
+引擎共 119 項設定，其中 50 項在這個版本沒有作用（26 項 macOS 專用、24 項沒有接上），不顯示（見 HIDDEN）。
 """
 import argparse
 import json
@@ -47,7 +47,7 @@ PAGES = [
         "ShowHanyuPinyinInCompositionBuffer", "TrimUnfinishedReadingsOnCommit", "EscToCleanInputBuffer",
     ]),
     ("keys", "按鍵行為", "個別按鍵在組字時做什麼。", [
-        "SpaceKeyBehaviorAgainstICB", "UpperCaseLetterKeyBehavior",
+        "SpaceKeyBehaviorAgainstICB", "UpperCaseLetterKeyBehavior", "NumPadCharInputBehavior",
         "SpecifyIntonationKeyBehavior",
         "SpecifyShiftBackSpaceKeyBehavior", "SpecifyShiftTabKeyBehavior",
         "SpecifyShiftSpaceKeyBehavior4CandidateWindow", "SpecifyShiftSpaceKeyBehavior4EmptyState",
@@ -78,7 +78,13 @@ PAGES = [
     ]),
     ("lexicon", "辭典與記憶", "使用者語彙、選字記憶與相關的資料檔。", [
         "FetchSuggestionsFromPerceptionOverrideModel", "ReducePOMLifetimeToNoMoreThan12Hours",
+        "AssociatedPhrasesEnabled", "AlsoConfirmAssociatedCandidatesByEnter",
         "PhraseReplacementEnabled", "UserPhrasesDatabaseBypassed",
+    ]),
+    ("cassette", "磁帶模式", "用 CIN 表格檔擴充其他輸入法（倉頡、嘸蝦米、五筆等）。請先指定磁帶檔，再啟用磁帶模式；"
+     "檔案讀不到時引擎會自動把磁帶模式關掉，免得打不出字。", [
+        "CassettePath", "CassetteEnabled", "ShowTranslatedStrokesInCompositionBuffer",
+        "AutoCompositeWithLongestPossibleCassetteKey",
     ]),
     ("debug", "偵錯", "開發與除錯用。", ["_DebugMode", ]),
 ]
@@ -129,11 +135,7 @@ HIDDEN_NOT_WIRED = {
     "SuppressTooltipForIntonationKeyOverrideEvents": "該提示在這個版本本來就顯示不出來。",
     "ShowReverseLookupInCandidateUI": "這個版本的選字視窗沒有顯示反查結果的欄位。",
     "HardenVerticalPunctuations": "這個版本沒有縱排輸入。",
-    "CassetteEnabled": "這個版本沒有接上磁帶檔的載入；打開磁帶模式卻沒有資料會打不出字。",
-    "CassettePath": "這個版本沒有接上磁帶檔的載入；打開磁帶模式卻沒有資料會打不出字。",
-    "ShowTranslatedStrokesInCompositionBuffer": "這個版本沒有接上磁帶檔的載入；打開磁帶模式卻沒有資料會打不出字。",
-    "ForceCassetteChineseConversion": "這個版本沒有接上磁帶檔的載入；打開磁帶模式卻沒有資料會打不出字。",
-    "AutoCompositeWithLongestPossibleCassetteKey": "這個版本沒有接上磁帶檔的載入；打開磁帶模式卻沒有資料會打不出字。",
+    "ForceCassetteChineseConversion": "引擎的程式碼裡沒有讀這一項；實測改了也沒有差異。",
     "UsingHotKeySCPC": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
     "UsingHotKeyAssociates": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
     "UsingHotKeyCNS": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
@@ -144,10 +146,7 @@ HIDDEN_NOT_WIRED = {
     "UsingHotKeyCassette": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
     "UsingHotKeyRevLookup": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
     "UsingHotKeyInputMode": "引擎本身不讀這一項；這些熱鍵在 macOS 版是由它的 app 處理的。",
-    "NumPadCharInputBehavior": "數字小鍵盤的按鍵在這個版本沒有正確傳給引擎，實測改了沒有差異。",
     "ReplaceSymbolMenuNodeWithUserSuppliedData": "這個版本沒有接上使用者的 symbols.dat，符號選單的內容是內建的。",
-    "AssociatedPhrasesEnabled": "關聯詞語的資料沒有載入，實測打開後沒有差異。",
-    "AlsoConfirmAssociatedCandidatesByEnter": "同上，關聯詞語在這個版本沒有作用。",
     "_FailureFlag_POMObservation": "引擎內部自己設的旗標，不是給使用者調的。",
 }
 HIDDEN += list(HIDDEN_NOT_WIRED)
@@ -161,7 +160,8 @@ EXTRA_TEXTS = {
     "MaxCandidateLength": ("候選字詞的最大長度", "候選字詞最多幾個字。"),
     "ClientsIMKTextInputIncapable": ("無法正常接收組字區的應用程式清單", "macOS 上針對特定應用程式的相容性清單，以 JSON 表示。"),
     "CandidateTextFontName": ("選字窗字型", "macOS 版選字窗使用的字型名稱。"),
-    "AssociatedPhrasesEnabled": ("關聯詞語模式", "送出一個字詞之後，接著列出常接在它後面的詞語供選取。"),
+    "AssociatedPhrasesEnabled": ("關聯詞語模式", "用 Shift+Enter 送出字詞（或在選字窗用 Shift+Enter 確認）之後，接著列出常接在它後面的詞語供選取。"
+                                 "資料在使用者資料夾的 associatedPhrases 檔，第一次啟動時由範本建立，可以自己增刪。"),
 }
 
 # 引擎沒有宣告選項、但其實只有固定幾個值的設定。
@@ -192,7 +192,17 @@ VERIFIED = {
     "UseHorizontalCandidateList", "UseRearCursorMode", "UseSCPCTypingMode",
     "UseShiftQuestionToCallServiceMenu", "UseSpaceToCommitHighlightedCandidate4SCPC",
     "UserPhrasesDatabaseBypassed", "enforceETenDOSCandidateSequence",
+    "NumPadCharInputBehavior",
+    "AssociatedPhrasesEnabled",
+    "AlsoConfirmAssociatedCandidatesByEnter",
+    "CassetteEnabled",
+    "CassettePath",
+    "ShowTranslatedStrokesInCompositionBuffer",
+    "AutoCompositeWithLongestPossibleCassetteKey",
 }
+
+# 值是檔案路徑的設定，旁邊多一顆選檔案的按鈕。
+FILE_KEYS = {"CassettePath"}
 
 PRODUCT_NAME_PATTERN = re.compile("唯音輸入法|唯音")
 
@@ -501,6 +511,8 @@ def run_window(arguments):
                 control.connect("value-changed", self.on_spin)
                 return control
             self.kind = "entry"
+            if self.key in FILE_KEYS:
+                return self.build_file_control(Gtk)
             control = Gtk.Entry(width_chars=28)
             if self.type in ("array", "dict"):
                 control.set_tooltip_text("JSON 格式。按 Enter 套用。")
@@ -508,6 +520,29 @@ def run_window(arguments):
                 control.set_tooltip_text("按 Enter 套用。")
             control.connect("activate", self.on_entry)
             return control
+
+        def build_file_control(self, Gtk):
+            """路徑類的設定：文字欄位加一顆選檔案的按鈕。"""
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            self.entry = Gtk.Entry(width_chars=28, tooltip_text="按 Enter 套用。")
+            self.entry.connect("activate", self.on_entry)
+            box.append(self.entry)
+            browse = Gtk.Button(label="選擇檔案…")
+            browse.connect("clicked", self.on_browse, Gtk)
+            box.append(browse)
+            return box
+
+        def on_browse(self, _button, Gtk):
+            dialog = Gtk.FileDialog(title=texts.title(self.item))
+
+            def finished(source, result):
+                try:
+                    chosen = source.open_finish(result)
+                except GLib.Error:
+                    return  # 使用者按了取消
+                self.changed(chosen.get_path())
+
+            dialog.open(self.window, None, finished)
 
         def on_dropdown(self, dropdown, _spec):
             index = dropdown.get_selected()
@@ -550,7 +585,8 @@ def run_window(arguments):
             elif self.kind == "spin":
                 self.control.set_value(value)
             else:
-                self.control.set_text(to_text(self.type, value) if self.type in ("array", "dict") else str(value))
+                entry = getattr(self, "entry", self.control)
+                entry.set_text(to_text(self.type, value) if self.type in ("array", "dict") else str(value))
             self.loading = False
             self.reset.set_sensitive(value != self.item["default"])
 
@@ -699,6 +735,8 @@ def run_window(arguments):
             title = texts.title(row.item)
             if problem:
                 self.say(f"「{title}」沒有套用：{problem}。")
+            elif row.key == "CassetteEnabled" and value and not row.item["value"]:
+                self.say("磁帶檔讀不到，引擎把磁帶模式關掉了。請先在上面指定磁帶檔案路徑。")
             elif row.item["value"] != value:
                 self.say(f"「{title}」的值被引擎改成 {to_text(row.type, row.item['value'])}（送出的值不被接受）。")
             else:

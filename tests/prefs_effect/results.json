@@ -26,14 +26,22 @@
   "status": "skipped"
  },
  "AlsoConfirmAssociatedCandidatesByEnter": {
-  "differing": {},
+  "differing": {
+   "true": {
+    "first": [
+     "  Enter                  h=1 組字區「」@0",
+     "    commit「們」"
+    ],
+    "lines": 92
+   }
+  },
   "prerequisites": [
    [
     "AssociatedPhrasesEnabled",
     "true"
    ]
   ],
-  "status": "no-difference",
+  "status": "effect",
   "values": [
    "true"
   ]
@@ -64,15 +72,42 @@
   "status": "skipped"
  },
  "AssociatedPhrasesEnabled": {
-  "differing": {},
-  "status": "no-difference",
+  "differing": {
+   "true": {
+    "first": [
+     "  Shift+Enter            h=1 組字區「」@0",
+     "  Shift+Enter            h=1 組字區「 」@0 候選[0/7] 像 處 幾 奇 手 轉 評 不容易 看 反白0"
+    ],
+    "lines": 5
+   }
+  },
+  "prerequisites": [],
+  "status": "effect",
   "values": [
    "true"
   ]
  },
  "AutoCompositeWithLongestPossibleCassetteKey": {
-  "differing": {},
-  "status": "no-difference",
+  "differing": {
+   "false": {
+    "first": [
+     "  su3cl3                 h=1 組字區「田」@3",
+     "  su3cl3                 h=1 組字區「木立又田」@12"
+    ],
+    "lines": 148
+   }
+  },
+  "prerequisites": [
+   [
+    "CassettePath",
+    "/home/deck/Desktop/fcitx5-vanguard/vendor/vChewing-LibVanguard/Sources/LXAssemblyMaterials4Tests/Resources/wubi.cin"
+   ],
+   [
+    "CassetteEnabled",
+    "true"
+   ]
+  ],
+  "status": "effect",
   "values": [
    "false"
   ]
@@ -185,11 +220,17 @@
    "true": {
     "first": [
      "  su3cl3                 h=1 組字區「你好」@6",
-     "  su3cl3                 h=0 組字區「33」@2"
+     "  su3cl3                 h=1 組字區「田」@3"
     ],
-    "lines": 180
+    "lines": 243
    }
   },
+  "prerequisites": [
+   [
+    "CassettePath",
+    "/home/deck/Desktop/fcitx5-vanguard/vendor/vChewing-LibVanguard/Sources/LXAssemblyMaterials4Tests/Resources/wubi.cin"
+   ]
+  ],
   "status": "effect",
   "values": [
    "true"
@@ -388,6 +429,16 @@
  },
  "ForceCassetteChineseConversion": {
   "differing": {},
+  "prerequisites": [
+   [
+    "CassettePath",
+    "/home/deck/Desktop/fcitx5-vanguard/vendor/vChewing-LibVanguard/Sources/LXAssemblyMaterials4Tests/Resources/wubi.cin"
+   ],
+   [
+    "CassetteEnabled",
+    "true"
+   ]
+  ],
   "status": "no-difference",
   "values": [
    "1",
@@ -649,8 +700,45 @@
   "status": "skipped"
  },
  "NumPadCharInputBehavior": {
-  "differing": {},
-  "status": "no-difference",
+  "differing": {
+   "1": {
+    "first": [
+     "    commit「1」",
+     "    commit「１」"
+    ],
+    "lines": 6
+   },
+   "2": {
+    "first": [
+     "    commit「你A」",
+     "  KP_1                   h=1 組字區「你A1」@5"
+    ],
+    "lines": 127
+   },
+   "3": {
+    "first": [
+     "    commit「你A」",
+     "  KP_1                   h=1 組字區「你A１」@7"
+    ],
+    "lines": 127
+   },
+   "4": {
+    "first": [
+     "    commit「你A」",
+     "  KP_1                   h=1 組字區「你A1」@5"
+    ],
+    "lines": 125
+   },
+   "5": {
+    "first": [
+     "    commit「你A」",
+     "  KP_1                   h=1 組字區「你A１」@7"
+    ],
+    "lines": 125
+   }
+  },
+  "prerequisites": [],
+  "status": "effect",
   "values": [
    "1",
    "2",
@@ -676,6 +764,7 @@
  },
  "PhraseReplacementEnabled": {
   "differing": {},
+  "prerequisites": [],
   "status": "no-difference",
   "values": [
    "true"
@@ -884,8 +973,26 @@
   ]
  },
  "ShowTranslatedStrokesInCompositionBuffer": {
-  "differing": {},
-  "status": "no-difference",
+  "differing": {
+   "false": {
+    "first": [
+     "  su3                    h=1 組字區「木立」@6",
+     "  su3                    h=1 組字區「su」@2"
+    ],
+    "lines": 57
+   }
+  },
+  "prerequisites": [
+   [
+    "CassettePath",
+    "/home/deck/Desktop/fcitx5-vanguard/vendor/vChewing-LibVanguard/Sources/LXAssemblyMaterials4Tests/Resources/wubi.cin"
+   ],
+   [
+    "CassetteEnabled",
+    "true"
+   ]
+  ],
+  "status": "effect",
   "values": [
    "false"
   ]

@@ -36,6 +36,11 @@ done
 
 cp "$LEXICON" "$OUT/share/vanguardTextMap.txtMap"
 cp "$LIBVANGUARD/Sources/BPMFVS/Resources/phonic_table_Z.txt" "$OUT/share/"
+# 關聯詞語的範本：資料不在辭庫檔裡，引擎第一次啟動時複製一份給使用者。
+mkdir -p "$OUT/share/templates"
+cp "$LEXICON_REPO"/Sources/LibVanguardChewingData/Resources/components/cht/template-associatedPhrases-cht.txt \
+   "$LEXICON_REPO"/Sources/LibVanguardChewingData/Resources/components/chs/template-associatedPhrases-chs.txt \
+   "$OUT/share/templates/"
 cp "$ROOT/engine/include/vanguard.h" "$OUT/include/"
 
 mkdir -p "$OUT/licenses/LibVanguard" "$OUT/licenses/VanguardLexicon" "$OUT/licenses/swift" "$OUT/licenses/fcitx5-vanguard"
@@ -57,6 +62,9 @@ vanguardTextMap.txtMap（MulanPSL-2.0）
   https://github.com/vChewing/vChewing-VanguardLexicon
   commit $(git -C "$LEXICON_REPO" rev-parse HEAD)
   指令：swift run -c release VCDataBuilder vanguardTextMap
+
+templates/template-associatedPhrases-*.txt（MulanPSL-2.0）：取自同一個辭庫 repo 的
+  Sources/LibVanguardChewingData/Resources/components/，未修改。
 
 phonic_table_Z.txt：取自 LibVanguard 的 Sources/BPMFVS/Resources/，授權見 LibVanguard/LICENSES/。
 

@@ -11,6 +11,8 @@ import SwiftExtension
 enum UserData {
   /// 使用者資料夾，由宿主在 vg_init 時指定。
   static var folder = URL(fileURLWithPath: "")
+  /// 套件帶的範本檔所在的目錄（辭庫旁邊的 templates/）。
+  static var templates: URL?
 
   static func dictURL(mode: Shared.InputMode, type: LXAssembly.ReplacableUserDataType) -> URL {
     let name = switch type {
@@ -34,8 +36,9 @@ enum UserData {
 
   /// 把引擎需要宿主提供的行為接上去。必須在第一次存取 `InputMode.lexicon` 之前呼叫：
   /// 語言模型建立時就會讀 `pomDataURL`。
-  static func wireUp(folder newFolder: URL) -> Bool {
+  static func wireUp(folder newFolder: URL, templates newTemplates: URL? = nil) -> Bool {
     folder = newFolder
+    templates = newTemplates
     guard ensureFilesExist() else { return false }
 
     let host = SessionHost.shared
@@ -81,11 +84,53 @@ enum UserData {
       mode.lexicon.pomReducedLifetime = PrefMgr.sharedSansDidSetOps.reducePOMLifetimeToNoMoreThan12Hours
       mode.lexicon.loadPOMData()
     }
-    if PrefMgr.sharedSansDidSetOps.phraseReplacementEnabled {
-      for mode in Shared.InputMode.validCases {
-        mode.lexicon.loadReplacementsData(path: dictURL(mode: mode, type: .theReplacements).path)
-      }
+    loadReplacements()
+    loadAssociates()
+    loadCassette()
+  }
+
+  /// 語彙置換表：功能開著才載入。
+  static func loadReplacements() {
+    guard PrefMgr.sharedSansDidSetOps.phraseReplacementEnabled else { return }
+    for mode in Shared.InputMode.validCases {
+      mode.lexicon.loadReplacementsData(path: dictURL(mode: mode, type: .theReplacements).path)
     }
+  }
+
+  /// 使用者自訂的關聯詞語：功能開著才載入。原廠辭庫本身也帶有關聯詞語，這份是額外補充的。
+  static func loadAssociates() {
+    guard PrefMgr.sharedSansDidSetOps.associatedPhrasesEnabled else { return }
+    for mode in Shared.InputMode.validCases {
+      mode.lexicon.loadUserAssociatesData(path: dictURL(mode: mode, type: .theAssociates).path)
+    }
+  }
+
+  /// 磁帶（CIN 表格檔）。磁帶模式開著、檔案卻讀不到的話，引擎會把所有按鍵當成磁帶的鍵而打不出任何字，
+  /// 所以讀不到時直接把磁帶模式關掉。回傳 false 表示因此關掉了磁帶模式。
+  @discardableResult
+  static func loadCassette() -> Bool {
+    let prefs = PrefMgr.sharedSansDidSetOps
+    guard prefs.cassetteEnabled else { return true }
+    let path = (prefs.cassettePath as NSString).expandingTildeInPath
+    guard !path.isEmpty, FileManager.default.isReadableFile(atPath: path) else {
+      prefs.cassetteEnabled = false
+      UserDefaults.standard.synchronize()
+      return false
+    }
+    LXAssembly.LXFacade.loadCassetteData(path: path)
+    return true
+  }
+
+  /// 某一項偏好設定改了之後，跟著重新載入對應的資料檔。回傳要顯示給使用者的訊息（沒有就是 nil）。
+  static func preferenceChanged(_ key: String) -> String? {
+    switch UserDef(rawValue: key) {
+    case .kPhraseReplacementEnabled: loadReplacements()
+    case .kAssociatedPhrasesEnabled: loadAssociates()
+    case .kCassetteEnabled, .kCassettePath:
+      if !loadCassette() { return "磁帶檔讀不到，已關閉磁帶模式" }
+    default: break
+    }
+    return nil
   }
 
   static func savePOM() {
@@ -93,6 +138,14 @@ enum UserData {
   }
 
   // MARK: Private
+
+  /// 套件帶的關聯詞語範本（跟辭庫裝在一起的 templates/ 目錄）。沒有就回傳 nil。
+  private static func associatesTemplate(mode: Shared.InputMode) -> String? {
+    guard let templates else { return nil }
+    let suffix = mode == .imeModeCHS ? "chs" : "cht"
+    let path = templates.appendingPathComponent("template-associatedPhrases-\(suffix).txt").path
+    return FileManager.default.isReadableFile(atPath: path) ? path : nil
+  }
 
   private static func ensureFilesExist() -> Bool {
     let manager = FileManager.default
@@ -104,6 +157,15 @@ enum UserData {
     for mode in Shared.InputMode.validCases {
       for type in LXAssembly.ReplacableUserDataType.allCases {
         let path = dictURL(mode: mode, type: type).path
+        // 關聯詞語的資料不在辭庫檔裡，而是一份範本，macOS 版在第一次使用時複製給使用者，之後由使用者自己增刪。
+        // 這裡照做：檔案不存在或還是空的，就拿套件帶的範本來用；使用者改過（有內容）就不動。
+        if type == .theAssociates, let template = associatesTemplate(mode: mode) {
+          let size = (try? manager.attributesOfItem(atPath: path)[.size] as? Int) ?? 0
+          if size == 0 {
+            try? manager.removeItem(atPath: path)
+            if (try? manager.copyItem(atPath: template, toPath: path)) != nil { continue }
+          }
+        }
         if !manager.fileExists(atPath: path), !manager.createFile(atPath: path, contents: nil) { return false }
       }
     }

@@ -66,6 +66,11 @@ int main(int argc, char **argv) {
     vg_pump();
     usleep(10000);
   }
+  // 磁帶、關聯詞語等資料檔是啟動後才在背景載入的，多排空幾輪讓它們就緒。
+  for (int i = 0; i < 40; i++) {
+    vg_pump();
+    usleep(10000);
+  }
   if (strcmp(argv[3], "set") == 0 && argc >= 6) {
     int rc = vg_pref_set(argv[4], argv[5]);
     vg_shutdown();
@@ -131,6 +136,20 @@ int main(int argc, char **argv) {
   type("su3cl3"); key("Ctrl+Enter", K_ENTER, CTRL); key("Esc", K_ESC, 0);
   type("su3cl3"); key("Ctrl+Alt+Enter", K_ENTER, CTRL | ALT); key("Esc", K_ESC, 0);
   type("su3cl3"); key("Ctrl+Alt+Super+Enter", K_ENTER, CTRL | ALT | SUPER); key("Esc", K_ESC, 0); key("Esc", K_ESC, 0);
+
+  scene("Shift+Enter 送出（關聯詞語的觸發鍵）");
+  type("su3cl3"); key("Shift+Enter", K_ENTER, SHIFT); show("之後", 0); key("1", '1', 0); show("選了之後", 0);
+  key("Esc", K_ESC, 0); key("Esc", K_ESC, 0);
+  type("su3"); key("↓", K_DOWN, 0); key("Shift+Enter（候選）", K_ENTER, SHIFT); show("之後", 0); key("Enter", K_ENTER, 0);
+  key("Esc", K_ESC, 0); key("Esc", K_ESC, 0);
+
+  scene("數字小鍵盤的其他鍵");
+  key("KP_0（空）", 0xffb0, 0); key("KP_+（空）", 0xffab, 0);
+  type("su3"); key("KP_5", 0xffb5, 0); key("KP_.", 0xffae, 0); key("Enter", K_ENTER, 0); key("Esc", K_ESC, 0);
+
+  scene("磁帶模式會用到的按鍵（字根）");
+  type("ggll"); key("Space", ' ', 0); key("Enter", K_ENTER, 0); key("Esc", K_ESC, 0); key("Esc", K_ESC, 0);
+  type("wq"); key("Space", ' ', 0); key("↓", K_DOWN, 0); key("Esc", K_ESC, 0); key("Enter", K_ENTER, 0); key("Esc", K_ESC, 0);
 
   scene("沒打完就送出");
   type("su3cl"); key("Enter", K_ENTER, 0); key("Esc", K_ESC, 0);
