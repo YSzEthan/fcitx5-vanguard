@@ -12,6 +12,7 @@ fetch() { # 名稱 網址 commit
     git -C "$dir" remote add origin "$2"
   fi
   if [ "$(git -C "$dir" rev-parse HEAD 2>/dev/null)" != "$3" ]; then
+    # 只抓這一個 commit；packaging/stage-engine.sh 會用它做出對應原始碼的壓縮檔。
     git -C "$dir" fetch -q --depth 1 origin "$3"
     git -C "$dir" checkout -q --detach "$3"
   fi

@@ -44,6 +44,8 @@ cp "$LIBVANGUARD/COPYING" "$OUT/licenses/LibVanguard/"
 cp -r "$LIBVANGUARD/LICENSES" "$OUT/licenses/LibVanguard/"
 cp "$LEXICON_REPO"/LICENSE*.txt "$OUT/licenses/VanguardLexicon/"
 cp "$(dirname "$RUNTIME_DIR")/../../share/swift/LICENSE.txt" "$OUT/licenses/swift/"
+# Swift 執行期各顆函式庫的來源對照，以及工具鏈沒有附的第三方聲明（swift-foundation 的 NOTICE、ICU 的授權）。
+cp "$ROOT"/packaging/third-party/* "$OUT/licenses/swift/"
 cat > "$OUT/licenses/SOURCES.txt" <<SRC
 這個目錄裡的二進位檔由下列原始碼編出，未經修改：
 
@@ -62,9 +64,28 @@ libVGEngine.so：本專案 engine/ 目錄，把引擎包成 C 介面（LGPL-3.0-
 
 其餘 lib*.so：Swift 執行期函式庫（Apache-2.0 WITH Swift-exception），
   $(swiftc --version 2>/dev/null | head -1)
+  各顆的來源專案與第三方聲明見 swift/README.md。
+
+LGPL 要求能取得對應的原始碼：上面兩個 commit 的完整原始碼，連同 libVGEngine.so 的原始碼，
+打包成 fcitx5-vanguard-engine-sources-$VERSION.tar.zst，跟這個套件放在同一個地方發佈。
 SRC
+
+# 對應原始碼的壓縮檔：不依賴上游 repo 還在不在、歷史有沒有被改寫。
+SOURCES_TARBALL="$ROOT/dist/fcitx5-vanguard-engine-sources-$VERSION.tar.zst"
+SOURCES_DIR="$(mktemp -d)"
+trap 'rm -rf "$SOURCES_DIR"' EXIT
+STEM="fcitx5-vanguard-engine-sources-$VERSION"
+mkdir -p "$SOURCES_DIR/$STEM"
+git -C "$LIBVANGUARD" archive --prefix="vChewing-LibVanguard-$(git -C "$LIBVANGUARD" rev-parse --short HEAD)/" HEAD | tar -x -C "$SOURCES_DIR/$STEM"
+git -C "$LEXICON_REPO" archive --prefix="vChewing-VanguardLexicon-$(git -C "$LEXICON_REPO" rev-parse --short HEAD)/" HEAD | tar -x -C "$SOURCES_DIR/$STEM"
+mkdir -p "$SOURCES_DIR/$STEM/fcitx5-vanguard"
+cp -r "$ROOT/engine/Package.swift" "$ROOT/engine/Sources" "$ROOT/engine/include" "$ROOT/COPYING" "$ROOT/COPYING.LESSER" \
+  "$SOURCES_DIR/$STEM/fcitx5-vanguard/"
+cp "$OUT/licenses/SOURCES.txt" "$SOURCES_DIR/$STEM/"
+tar --sort=name --owner=0 --group=0 --numeric-owner -C "$SOURCES_DIR" -cf - "$STEM" | zstd -q -19 -T0 -f -o "$SOURCES_TARBALL"
 
 TARBALL="$ROOT/dist/fcitx5-vanguard-engine-$VERSION-x86_64.tar.zst"
 tar --sort=name --owner=0 --group=0 --numeric-owner -C "$(dirname "$OUT")" -cf - "$(basename "$OUT")" | zstd -q -19 -T0 -f -o "$TARBALL"
 echo "引擎目錄：$OUT（$(du -sh "$OUT" | cut -f1)）"
 echo "tarball：$TARBALL（$(du -h "$TARBALL" | cut -f1)）"
+echo "原始碼：$SOURCES_TARBALL（$(du -h "$SOURCES_TARBALL" | cut -f1)）"
