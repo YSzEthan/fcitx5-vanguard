@@ -1,5 +1,6 @@
 # 每次 push：編引擎、跑測試、做 deb，再把外掛做成 flatpak 版 Fcitx5 的擴充。
-# 產物掛在該次執行的 Artifacts：引擎 tarball、deb、fcitx5-vanguard.flatpak。
+# 產物掛在該次執行的 Artifacts：引擎 tarball、引擎原始碼、deb、fcitx5-vanguard.flatpak。
+# 只保留 3 天：私人 repo 的儲存額度有限，一次約 80MB，留預設的 90 天很快就滿。
 #
 name: build
 
@@ -50,18 +51,21 @@ jobs:
           name: engine
           path: dist/fcitx5-vanguard-engine-*.tar.zst
           if-no-files-found: error
+          retention-days: 3
 
       - uses: actions/upload-artifact@v4
         with:
           name: engine-sources
           path: dist/fcitx5-vanguard-engine-sources-*.tar.zst
           if-no-files-found: error
+          retention-days: 3
 
       - uses: actions/upload-artifact@v4
         with:
           name: deb
           path: dist/*.deb
           if-no-files-found: error
+          retention-days: 3
 
       - name: 測試失敗時留下 fcitx5 的紀錄
         if: failure()
@@ -71,6 +75,7 @@ jobs:
           path: |
             addon/build/sandbox/fcitx5.log
             addon/build/prefs/*.log
+          retention-days: 3
 
   flatpak:
     name: flatpak 擴充
@@ -123,3 +128,4 @@ jobs:
           name: flatpak
           path: dist/fcitx5-vanguard.flatpak
           if-no-files-found: error
+          retention-days: 3
