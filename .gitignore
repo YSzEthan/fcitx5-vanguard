@@ -5,3 +5,6 @@ build/
 logs/
 prefix/
 dist/
+# 只留在本機的工作紀錄，不公開
+STATUS.md
+PLAN.md

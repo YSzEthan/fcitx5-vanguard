@@ -1,5 +1,4 @@
 # **還沒有實際建置過**：由 .github/workflows/build.yml 在每次 push 時建置，但那份流程也還沒跑過。
-# 評估過程與依據見 STATUS.md「階段 5」的 flatpak 一節。
 #
 # 做成 flatpak 版 Fcitx5（org.fcitx.Fcitx5）的擴充。該應用程式的擴充點是
 # org.fcitx.Fcitx5.Addon，掛在 /app/addons/<名稱>/；它的啟動腳本會把每個擴充的

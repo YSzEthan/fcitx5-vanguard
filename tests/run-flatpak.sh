@@ -9,7 +9,7 @@
 #   - 執行 flatpak 時把 HOME 換成 dist/flatpak-test/home，所以沙盒用的是那底下全新的
 #     .var/app/org.fcitx.Fcitx5，不讀也不寫真正的 Fcitx5 設定。
 #     （注意：flatpak 會無視 --env=XDG_CONFIG_HOME 這類設定，一律用 $HOME/.var/app/<應用程式>；
-#       第一次測試就是這樣誤用了真正的設定目錄，見 STATUS.md。只有換 HOME 才隔離得了。）
+#       第一次測試就是這樣誤用了真正的設定目錄。只有換 HOME 才隔離得了。）
 #   - 啟動指令就是沙盒裡原本的 /app/bin/fcitx5，外掛靠登記檔裡的絕對路徑被找到
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

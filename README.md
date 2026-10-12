@@ -30,8 +30,6 @@ An unofficial Fcitx5 addon for typing Traditional Chinese with Bopomofo (Zhuyin)
 - fcitx5 預設把左 Shift 當成全域熱鍵，所以切換中英要用右 Shift，或先到 fcitx5 的全域設定把那個熱鍵拿掉。
 - 套件約 80MB，因為把 Swift 執行期一起帶著：各發行版的官方套件庫都沒有 Swift 6.4。
 
-完整的進度、每一階段的驗證結果與沒驗證的事，都記在 [STATUS.md](STATUS.md)。
-
 ## 安裝
 
 目前沒有發佈預先編好的套件，要自己建置（見下一節）。建置後：
@@ -90,7 +88,7 @@ Arch 的套件是「部分預編」：在 Arch 上只編 C++ 的外掛本體，�
 | `packaging/` | deb、Arch、flatpak 的打包腳本與第三方授權聲明 |
 | `probe/`、`shim/` | 早期用來驗證「引擎能不能載進不跑 dispatch 主迴圈的行程」的實驗，留作紀錄 |
 
-引擎是 Swift 寫的，內部大量使用主執行緒佇列；fcitx5 跑的是自己的事件迴圈。外掛在每次呼叫引擎之後、以及每 50 毫秒，用 `RunLoop.main.run(mode:before:)` 排空主佇列，引擎才動得起來。細節在 STATUS.md 的「結論」。
+引擎是 Swift 寫的，內部大量使用主執行緒佇列；fcitx5 跑的是自己的事件迴圈。外掛在每次呼叫引擎之後、以及每 50 毫秒，用 `RunLoop.main.run(mode:before:)` 排空主佇列，引擎才動得起來。不排空的話引擎內部狀態看起來正常，但前端完全收不到組字區，而且不會有任何錯誤訊息。
 
 ## 授權
 
