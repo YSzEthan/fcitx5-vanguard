@@ -6,6 +6,7 @@
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -484,7 +485,11 @@ def main():
         report.equal("所以還是能正常打注音", client.preedit, "你")
         client.key(KEY_ESCAPE)
         if os.path.exists(cassette):
-            settings("--set", f"CassettePath={os.path.abspath(cassette)}")
+            # 複製到 fcitx5 的資料目錄再用：flatpak 版的 fcitx5 在沙盒裡，讀不到專案目錄底下的檔案。
+            usable = os.path.join(os.environ["XDG_DATA_HOME"], "wubi.cin")
+            os.makedirs(os.path.dirname(usable), exist_ok=True)
+            shutil.copyfile(cassette, usable)
+            settings("--set", f"CassettePath={usable}")
             settings("--set", "CassetteEnabled=true")
             report.equal("指定讀得到的磁帶檔之後可以啟用", settings("--get", "CassetteEnabled")[1], "true")
             client.settle(0.5)

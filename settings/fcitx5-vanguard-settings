@@ -82,7 +82,8 @@ PAGES = [
         "PhraseReplacementEnabled", "UserPhrasesDatabaseBypassed",
     ]),
     ("cassette", "磁帶模式", "用 CIN 表格檔擴充其他輸入法（倉頡、嘸蝦米、五筆等）。請先指定磁帶檔，再啟用磁帶模式；"
-     "檔案讀不到時引擎會自動把磁帶模式關掉，免得打不出字。", [
+     "檔案讀不到時引擎會自動把磁帶模式關掉，免得打不出字。"
+     "如果用的是 flatpak 版的 Fcitx5，磁帶檔要放在它讀得到的地方，例如 ~/.var/app/org.fcitx.Fcitx5/data/ 底下。", [
         "CassettePath", "CassetteEnabled", "ShowTranslatedStrokesInCompositionBuffer",
         "AutoCompositeWithLongestPossibleCassetteKey",
     ]),
