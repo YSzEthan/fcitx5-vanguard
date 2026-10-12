@@ -14,10 +14,11 @@ WORK="$ROOT/dist/arch"
 rm -rf "$WORK"
 mkdir -p "$WORK"
 cp "$ROOT/dist/$ENGINE" "$WORK/"
-# 外掛的原始碼：只有 addon/ 底下三樣。
+# 外掛的原始碼（addon/ 底下三樣）與設定程式（settings/）。
 tar --sort=name --owner=0 --group=0 --numeric-owner --mtime='2026-01-01 00:00:00' \
   --transform "s|^|fcitx5-vanguard-$VERSION/|" -C "$ROOT" \
-  -czf "$WORK/$SOURCE" addon/CMakeLists.txt addon/src addon/data
+  -czf "$WORK/$SOURCE" addon/CMakeLists.txt addon/src addon/data \
+  settings/fcitx5-vanguard-settings settings/strings settings/org.fcitx.Fcitx5.Addon.Vanguard.Settings.desktop
 
 SUM_SOURCE="$(sha256sum "$WORK/$SOURCE" | cut -d' ' -f1)"
 SUM_ENGINE="$(sha256sum "$WORK/$ENGINE" | cut -d' ' -f1)"

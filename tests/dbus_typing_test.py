@@ -407,7 +407,54 @@ def main():
         report.equal("關掉後回到一般注音", client.preedit, "ㄋㄧ")
         client.key(KEY_ESCAPE)
 
-        print("17. 閒置 1 秒後 fcitx5 仍然正常")
+        print("17. 獨立設定程式（settings/fcitx5-vanguard-settings）：經 DBus 讀寫引擎全部的偏好設定")
+        tool = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "settings", "fcitx5-vanguard-settings")
+
+        def settings(*arguments, **extra):
+            result = subprocess.run([sys.executable, tool, *arguments], capture_output=True, text=True,
+                                    env={**os.environ, **extra.get("env", {})})
+            return result.returncode, result.stdout.strip(), result.stderr.strip()
+
+        code, output, error = settings("--check")
+        print("    " + output.replace("\n", "\n    ") + (("\n    " + error) if error else ""))
+        report.equal("分頁表、翻譯表跟引擎的設定對得起來", code, 0)
+        code, output, _error = settings("--list")
+        listed = [line.split("\t") for line in output.splitlines()]
+        report.equal("列得出全部 119 項", (code, len(listed)), (0, 119))
+        report.check("每一項都有分頁與標題", all(len(line) == 5 and line[0] != "？" and line[4] for line in listed))
+        report.equal("讀一項", settings("--get", "CandidateKeys")[:2], (0, "123456789"))
+        report.equal("寫整數選項", settings("--set", "SpaceKeyBehaviorAgainstICB=0")[0], 0)
+        report.equal("讀回來", settings("--get", "SpaceKeyBehaviorAgainstICB")[1], "0")
+        before = len(client.commits)
+        client.type("su3")
+        client.key(ord(" "))
+        report.equal("設定真的生效：空白鍵變成先送出再插入空白", "".join(client.commits[before:]), "你 ")
+        settings("--set", "SpaceKeyBehaviorAgainstICB=1")
+        report.check("超出範圍的值被拒絕", settings("--set", "SpaceKeyBehaviorAgainstICB=9")[0] != 0)
+        report.check("格式不對的值被拒絕", settings("--set", "UseSCPCTypingMode=maybe")[0] != 0)
+        report.check("不認得的 key 被拒絕", settings("--set", "NoSuchPreference=1")[0] != 0)
+        report.equal("被拒絕後原值不變", settings("--get", "SpaceKeyBehaviorAgainstICB")[1], "1")
+        report.equal("寫字串陣列（JSON）", settings("--set", 'AppleLanguages=["zh-Hant"]')[0], 0)
+        report.equal("讀回來", settings("--get", "AppleLanguages")[1], '["zh-Hant"]')
+        settings("--set", "AppleLanguages=[]")
+
+        if os.environ.get("VANGUARD_TEST_GUI"):
+            # 沒有螢幕：用 GTK 的 broadway 後端把視窗建起來，確認每一項設定都有一列。
+            display = ":7"
+            broadway = subprocess.Popen(["gtk4-broadwayd", display], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(0.5)
+            try:
+                gui_env = {"GDK_BACKEND": "broadway", "BROADWAY_DISPLAY": display, "GSK_RENDERER": "cairo"}
+                shots = os.environ.get("VANGUARD_TEST_SCREENSHOTS")
+                code, output, error = settings("--self-test", *(["--screenshot", shots] if shots else []), env=gui_env)
+                print("    " + output.replace("\n", "\n    "))
+                report.check("視窗建得起來，119 項各有一列", code == 0, error[-300:])
+            finally:
+                broadway.terminate()
+        else:
+            print("    （這次執行沒有啟用視窗的檢查）")
+
+        print("18. 閒置 1 秒後 fcitx5 仍然正常")
         client.settle(1.0)
         report.check("fcitx5 行程還活著", fcitx5.poll() is None)
     finally:
@@ -419,19 +466,19 @@ def main():
         waited = wait_for_lexicon(client)
         report.check("辭庫載入完成", waited is not None, f"等了 {waited:.2f} 秒" if waited is not None else "逾時")
 
-        print("18. 選字記憶還在：第 3 步選過的詞變成首選")
+        print("19. 選字記憶還在：第 3 步選過的詞變成首選")
         client.type("su065j/ ")
         report.equal("組字區", client.preedit, chosen)
         client.key(KEY_ESCAPE)
 
-        print("19. 使用者語彙還在")
+        print("20. 使用者語彙還在")
         client.type(phrase_keys)
         client.key(KEY_DOWN)
         report.check("候選字裡有第 10 步加的詞", phrase in candidate_texts(client), f"{candidate_texts(client)[:6]}")
         client.key(KEY_ESCAPE)
         client.key(KEY_ESCAPE)
 
-        print("20. 偏好設定與使用者資料落地的位置")
+        print("21. 偏好設定與使用者資料落地的位置")
         # 檔名取自行程名稱：一般安裝是 fcitx5，flatpak 版的執行檔叫 fcitx5-bin。
         found = [name for name in ("fcitx5.plist", "fcitx5-bin.plist")
                  if os.path.exists(os.path.join(os.environ["XDG_CONFIG_HOME"], name))]

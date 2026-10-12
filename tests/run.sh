@@ -66,6 +66,12 @@ done
 echo "    偏好設定檔：$(cd "$PREFS" && find . -name '*.plist')"
 
 echo "##### 打字：真的 fcitx5 行程，經 DBus #####"
+# 有 GTK 4 與它的 broadway 後端時，順便把設定程式的視窗建起來檢查（不需要螢幕）。
+GUI=
+if command -v gtk4-broadwayd >/dev/null && python3 -c 'import gi; gi.require_version("Gtk", "4.0")' 2>/dev/null; then
+  GUI=1
+  mkdir -p "$WORK/screenshots"
+fi
 env -i \
   PATH=/usr/bin:/bin \
   LANG=C.UTF-8 \
@@ -77,5 +83,7 @@ env -i \
   ${DATA_DIRS:+XDG_DATA_DIRS="$DATA_DIRS"} \
   ${ADDON_DIRS:+FCITX_ADDON_DIRS="$ADDON_DIRS"} \
   FCITX5_LOG="$SANDBOX/fcitx5.log" \
+  ${GUI:+VANGUARD_TEST_GUI=1} \
+  ${GUI:+VANGUARD_TEST_SCREENSHOTS="$WORK/screenshots/settings"} \
   dbus-run-session -- python3 "$ROOT/tests/dbus_typing_test.py" "$@" || STATUS=1
 exit $STATUS

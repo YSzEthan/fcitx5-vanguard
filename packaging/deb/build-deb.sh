@@ -43,7 +43,7 @@ Version: ${VERSION}-${REVISION}
 Architecture: $ARCH
 Maintainer: $MAINTAINER
 Installed-Size: $(du -sk "$PKG/usr" | cut -f1)
-Depends: fcitx5 (>= 5.1), $SHLIBS
+Depends: fcitx5 (>= 5.1), $SHLIBS, python3, python3-gi, gir1.2-gtk-4.0
 Section: utils
 Priority: optional
 Description: Bopomofo (Zhuyin) input method for Fcitx5 built on the LibVanguard engine
@@ -56,6 +56,7 @@ CTL
 (cd "$PKG" && find usr -type f -exec md5sum {} + > DEBIAN/md5sums)
 find "$PKG" -type d -exec chmod 755 {} +
 find "$PKG/usr" -type f -exec chmod 644 {} +
+chmod 755 "$PKG/usr/bin/fcitx5-vanguard-settings"
 
 dpkg-deb --root-owner-group --build "$PKG" "$DEB" >/dev/null
 echo "deb：$DEB（$(du -h "$DEB" | cut -f1)）"

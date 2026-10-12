@@ -1,0 +1,747 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
+"""fcitx5-vanguard 的獨立設定程式。
+
+設定值存在 fcitx5 行程裡的引擎。這支程式透過 fcitx5 的 DBus 介面
+（Controller1 的 GetConfig／SetConfig，路徑 fcitx://config/addon/vanguard/prefs）讀寫，
+所以 fcitx5 要在執行中；flatpak 版的 fcitx5 也連得到。
+
+引擎的每一項偏好設定只帶翻譯表的 key，實際的標題與說明取自 strings/zh-Hant.strings
+（來自 macOS 版，MulanPSL-2.0，見 strings/README.md）。分頁與「在這個版本有沒有作用」的標示
+是本專案自己整理的。
+
+用法：
+  fcitx5-vanguard-settings              開啟視窗
+  fcitx5-vanguard-settings --list       列出全部設定與目前的值
+  fcitx5-vanguard-settings --get KEY
+  fcitx5-vanguard-settings --set KEY=VALUE
+  fcitx5-vanguard-settings --check      檢查分頁表與翻譯表有沒有漏掉引擎的設定
+"""
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+
+import gi
+from gi.repository import Gio, GLib
+
+APP_ID = "org.fcitx.Fcitx5.Addon.Vanguard.Settings"
+WINDOW_TITLE = "Vanguard 注音設定"
+CONFIG_URI = "fcitx://config/addon/vanguard/prefs"
+
+# ---------------------------------------------------------------------------
+# 分頁。引擎沒有「哪一項屬於哪一頁」的資料（macOS 版的版面寫在它的 app 裡），這是本專案自己分的。
+# 每一頁：(代號, 標題, 頁首說明, [引擎的偏好設定 key…])
+# ---------------------------------------------------------------------------
+PAGES = [
+    ("typing", "打字", "注音排列與組字的方式。", [
+        "KeyboardParser4Zhuyin", "PinyinTypingEnabled", "KeyboardParser4Pinyin",
+        "MixedAlphanumericalEnabled", "MixedAlnumJudgeReadingsBySequentialRawKeyOrder",
+        "EnableLatchedAlnumStateInMixedAlnumMode",
+        "FuriousTypingEnabled4Zhuyin", "FuriousTypingEnabled4Pinyin", "UseSCPCTypingMode",
+        "AutoCorrectReadingCombination", "AcceptLeadingIntonations", "KeepReadingUponCompositionError",
+        "ShowHanyuPinyinInCompositionBuffer", "TrimUnfinishedReadingsOnCommit", "EscToCleanInputBuffer",
+    ]),
+    ("keys", "按鍵行為", "個別按鍵在組字時做什麼。", [
+        "SpaceKeyBehaviorAgainstICB", "UpperCaseLetterKeyBehavior", "NumPadCharInputBehavior",
+        "SpecifyIntonationKeyBehavior", "SuppressTooltipForIntonationKeyOverrideEvents",
+        "SpecifyShiftBackSpaceKeyBehavior", "SpecifyShiftTabKeyBehavior",
+        "SpecifyShiftSpaceKeyBehavior4CandidateWindow", "SpecifyShiftSpaceKeyBehavior4EmptyState",
+        "SpecifyCmdOptCtrlEnterBehavior", "InlineDumpPinyinInLieuOfZhuyin", "ReflectBPMFVSInCompositionBuffer",
+        "ClassicHaninKeyboardSymbolModeShortcutEnabled", "RomanNumeralOutputFormat",
+    ]),
+    ("alnum", "中英切換", "用 Shift 或 Caps Lock 切換英數模式。"
+     "fcitx5 預設把左 Shift 設成全域熱鍵（暫時切到第一個輸入法），那個設定開著時左 Shift 到不了這裡。", [
+        "TogglingAlphanumericalModeWithLShift", "TogglingAlphanumericalModeWithRShift",
+        "ShowNotificationsWhenTogglingShift", "ShareAlphanumericalModeStatusAcrossClients",
+        "BypassNonAppleCapsLockHandling", "ShiftEisuToggleOffTogetherWithCapsLock",
+        "ShowNotificationsWhenTogglingCapsLock", "ShowNotificationsWhenTogglingEisu",
+        "ShowModeDescriptionOnActivatingServer",
+    ]),
+    ("candidates", "選字", "選字視窗的內容與選字時的行為。視窗的字型、顏色、外框由 fcitx5 的佈景決定，不在這裡。", [
+        "UseHorizontalCandidateList", "CandidateKeys", "UseRearCursorMode",
+        "CursorBehaviorAfterConfirmingCandidate", "DodgeInvalidEdgeCandidateCursorPosition",
+        "CandidateStateJKHLBehavior", "UseShiftQuestionToCallServiceMenu",
+        "ConsolidateContextOnCandidateSelection", "PreferredRevolverForceLevel",
+        "UseFixedCandidateOrderOnSelection", "enforceETenDOSCandidateSequence",
+        "UseSpaceToCommitHighlightedCandidate4SCPC", "AlsoConfirmAssociatedCandidatesByEnter",
+        "ShowCodePointInCandidateUI", "ShowReverseLookupInCandidateUI",
+        "AllowRescoringSingleKanjiCandidates", "MaxCandidateLength", "CandidateServiceMenuContents",
+    ]),
+    ("output", "輸出", "送出去的字要不要再轉換。", [
+        "MostRecentInputMode", "KanjiConversionPreferences", "CNS11643Enabled",
+        "FilterNonCNSReadingsForCHTInput", "FilterFactoryKanjisOfNonCurrentInputMode",
+        "HalfWidthPunctuationEnable", "CurrencyNumeralsEnabled", "SymbolInputEnabled",
+        "SuppressFactoryUnigramsOfKanaSyllables", "HardenVerticalPunctuations", "DeltaOfCalendarYears",
+    ]),
+    ("lexicon", "辭典與記憶", "使用者語彙、選字記憶與相關的資料檔。", [
+        "FetchSuggestionsFromPerceptionOverrideModel", "ReducePOMLifetimeToNoMoreThan12Hours",
+        "AssociatedPhrasesEnabled", "PhraseReplacementEnabled", "UserPhrasesDatabaseBypassed",
+        "ReplaceSymbolMenuNodeWithUserSuppliedData", "ShouldAutoReloadUserDataFiles",
+        "UserDataFolderSpecified", "UseExternalFactoryDict",
+    ]),
+    ("cassette", "磁帶模式", "用 CIN 表格檔擴充其他輸入法（倉頡、嘸蝦米等）。", [
+        "CassetteEnabled", "CassettePath", "ShowTranslatedStrokesInCompositionBuffer",
+        "ForceCassetteChineseConversion", "AutoCompositeWithLongestPossibleCassetteKey",
+    ]),
+    ("hotkeys", "熱鍵", "要不要啟用引擎內建的功能切換熱鍵。這些熱鍵在 macOS 版是 Ctrl+Command+字母，"
+     "Linux 鍵盤沒有 Command 鍵，實際按不按得出來沒有驗證過。", [
+        "UsingHotKeySCPC", "UsingHotKeyAssociates", "UsingHotKeyCNS", "UsingHotKeyKanjiConversionMode",
+        "UsingHotKeyPinyinZhuyinTypingSwitch", "UsingHotKeyHalfWidthPunctuation",
+        "UsingHotKeyCurrencyNumerals", "UsingHotKeyCassette", "UsingHotKeyRevLookup", "UsingHotKeyInputMode",
+    ]),
+    ("maconly", "macOS 專用", "這些設定管的是 macOS 版自己畫的視窗、音效、系統整合等。"
+     "這個版本沒有對應的東西，改了會存進引擎，但不會有任何效果。列在這裡是為了完整。", [
+        "CandidateListTextSize", "CandidateTextFontName", "CandidateWindowShowOnlyOneLine",
+        "AlwaysExpandCandidateWindow", "EnforceSingleLineCandidateWindowLayout4SCPC",
+        "MinCellWidthForHorizontalMatrix", "UseDynamicCandidateWindowOrigin", "EnableCandidateWindowAnimation",
+        "RespectClientAccentColor", "PopupCompositionBufferTextSize", "AlwaysUsePCBWithElectronBasedClients",
+        "SecurityHardenedCompositionBuffer", "ClientsIMKTextInputIncapable",
+        "DisableSegmentedThickUnderlineInMarkingModeForManagedClients", "AlwaysShowTooltipTextsHorizontally",
+        "OverrideNotifyUIColorScheme", "BeepSoundPreference", "ShouldNotFartInLieuOfBeep",
+        "ReadingNarrationCoverage", "CandidateNarrationToggleType",
+        "BasicKeyboardLayout", "AlphanumericalKeyboardLayout", "AppleLanguages",
+        "CheckUpdateAutomatically", "CheckAbusersOfSecureEventInputAPI",
+        "PhraseEditorAutoReloadExternalModifications",
+    ]),
+    ("debug", "偵錯", "開發與除錯用。", ["_DebugMode", "_FailureFlag_POMObservation"]),
+]
+
+# 引擎沒有給標題的幾項（macOS 版把它們放在選單或別的地方），這裡自己補。
+EXTRA_TEXTS = {
+    "_FailureFlag_POMObservation": ("選字記憶觀察失敗旗標", "引擎內部用：上次觀察選字記憶時當掉就會設起來，下次啟動時據此停用該功能。平常不需要動。"),
+    "CandidateServiceMenuContents": ("選字窗服務選單的內容", "在選字窗按 Shift+? 叫出的服務選單項目，每一項的格式是「名稱: 內容」。以 JSON 字串陣列表示。"),
+    "DeltaOfCalendarYears": ("紀年換算的年份差", "輸入日期巨集時用來換算紀年的年份差。"),
+    "MostRecentInputMode": ("輸出字體", "繁體中文或簡體中文。兩種字體各有自己的使用者語彙檔與選字記憶。"),
+    "MaxCandidateLength": ("候選字詞的最大長度", "候選字詞最多幾個字。"),
+    "ClientsIMKTextInputIncapable": ("無法正常接收組字區的應用程式清單", "macOS 上針對特定應用程式的相容性清單，以 JSON 表示。"),
+    "CandidateTextFontName": ("選字窗字型", "macOS 版選字窗使用的字型名稱。"),
+    "AssociatedPhrasesEnabled": ("關聯詞語模式", "送出一個字詞之後，接著列出常接在它後面的詞語供選取。"),
+}
+
+# 引擎沒有宣告選項、但其實只有固定幾個值的設定。
+EXTRA_OPTIONS = {
+    "MostRecentInputMode": [
+        ("org.atelierInmu.inputmethod.vChewing.IMECHT", "繁體中文"),
+        ("org.atelierInmu.inputmethod.vChewing.IMECHS", "簡體中文"),
+    ],
+}
+
+# 在這個版本實際驗證過有作用的（自動測試或手動量測過）。
+VERIFIED = {
+    "UseHorizontalCandidateList", "CandidateKeys", "MixedAlphanumericalEnabled",
+    "TogglingAlphanumericalModeWithLShift", "TogglingAlphanumericalModeWithRShift",
+    "ShowNotificationsWhenTogglingShift", "UpperCaseLetterKeyBehavior", "BypassNonAppleCapsLockHandling",
+    "FetchSuggestionsFromPerceptionOverrideModel", "KeyboardParser4Zhuyin",
+}
+
+# 已知在這個版本沒有作用的，以及原因。「macOS 專用」那一頁整頁都算，不必列在這裡。
+NO_EFFECT = {
+    "KanjiConversionPreferences": "這個版本沒有接上漢字轉換器。",
+    "UserDataFolderSpecified": "這個版本的使用者資料夾位置是固定的（見本頁下方）。",
+    "ShouldAutoReloadUserDataFiles": "這個版本沒有監看檔案變動；改了語彙檔要重新啟動 fcitx5。",
+    "UseExternalFactoryDict": "這個版本的辭庫路徑由套件決定。",
+    "ShowNotificationsWhenTogglingCapsLock": "這個版本沒有接上 Caps Lock 的切換通知。",
+    "ShowNotificationsWhenTogglingEisu": "Linux 鍵盤沒有 JIS 英數鍵的對應處理。",
+    "ShiftEisuToggleOffTogetherWithCapsLock": "這個版本沒有接上 Caps Lock 的狀態控制。",
+    "ShowModeDescriptionOnActivatingServer": "提示文字的翻譯表不在 fcitx5 行程裡，顯示不出來。",
+    "SuppressTooltipForIntonationKeyOverrideEvents": "該提示在這個版本本來就顯示不出來。",
+    "ShowReverseLookupInCandidateUI": "這個版本的選字視窗沒有顯示反查結果的欄位。",
+    "HardenVerticalPunctuations": "這個版本沒有縱排輸入。",
+}
+
+PRODUCT_NAME_PATTERN = re.compile("唯音輸入法|唯音")
+
+
+# ---------------------------------------------------------------------------
+# 翻譯表
+# ---------------------------------------------------------------------------
+def strings_path():
+    here = os.path.dirname(os.path.realpath(__file__))
+    for candidate in (
+        os.path.join(here, "strings", "zh-Hant.strings"),
+        os.path.join(here, "..", "share", "fcitx5-vanguard", "settings", "zh-Hant.strings"),
+        "/usr/share/fcitx5-vanguard/settings/zh-Hant.strings",
+    ):
+        if os.path.exists(candidate):
+            return candidate
+    return None
+
+
+def load_strings():
+    """讀 Apple 的 .strings 格式：每行 "key" = "value"; 值裡有 \\n、\\"、\\\\ 的跳脫。"""
+    path = strings_path()
+    if not path:
+        return {}
+    table = {}
+    pattern = re.compile(r'^"((?:[^"\\]|\\.)*)"\s*=\s*"((?:[^"\\]|\\.)*)";', re.M)
+    unescape = lambda text: re.sub(r"\\(.)", lambda m: {"n": "\n", "t": "\t"}.get(m.group(1), m.group(1)), text)
+    with open(path, encoding="utf-8") as handle:
+        for match in pattern.finditer(handle.read()):
+            table[unescape(match.group(1))] = unescape(match.group(2))
+    return table
+
+
+class Texts:
+    def __init__(self):
+        self.table = load_strings()
+
+    def lookup(self, key):
+        """翻譯表有就回傳翻譯；沒有而且是 i18n key 就回傳 None；其餘（數字等）原樣回傳。"""
+        if not key:
+            return None
+        if key in self.table:
+            # 本專案不使用原專案的產品名稱。
+            return PRODUCT_NAME_PATTERN.sub("本輸入法", self.table[key])
+        return None if key.startswith("i18n:") else key
+
+    def title(self, item):
+        if item["key"] in EXTRA_TEXTS:
+            return EXTRA_TEXTS[item["key"]][0]
+        title = self.lookup(item.get("texts", {}).get("title"))
+        return (title or item["key"]).rstrip(":：").strip()
+
+    def description(self, item):
+        if item["key"] in EXTRA_TEXTS:
+            return EXTRA_TEXTS[item["key"]][1]
+        texts = item.get("texts", {})
+        parts = [self.lookup(texts.get(name)) for name in ("description", "prompt", "inlinePrompt", "toolTip")]
+        seen = []
+        for part in parts:
+            if part and part not in seen:
+                seen.append(part)
+        return "\n".join(seen)
+
+    def options(self, item):
+        """[(引擎的值, 顯示文字)]；沒有固定選項就回傳 None。"""
+        if item["key"] in EXTRA_OPTIONS:
+            return EXTRA_OPTIONS[item["key"]]
+        options = item.get("options")
+        if not options:
+            return None
+        labelled = [(option["value"], self.lookup(str(option["label"]))) for option in options]
+        # 標籤就是數字本身的（字級之類）當成數值欄位，不做成選單。
+        if all(label is None or label == str(value) for value, label in labelled):
+            return None
+        return [(value, label or str(value)) for value, label in labelled]
+
+
+# ---------------------------------------------------------------------------
+# 跟 fcitx5 裡的引擎溝通
+# ---------------------------------------------------------------------------
+class EngineError(Exception):
+    pass
+
+
+WRITE_ERRORS = {1: "引擎不認得這一項", 2: "格式不對", 3: "超出允許的範圍"}
+
+
+def to_text(item_type, value):
+    """把值轉成引擎的 vg_pref_set 接受的字串。"""
+    if item_type == "bool":
+        return "true" if value else "false"
+    if item_type in ("array", "dict"):
+        return json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
+class Engine:
+    def __init__(self):
+        try:
+            self.bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        except GLib.Error as error:
+            raise EngineError(f"連不上 session bus：{error.message}")
+
+    def _call(self, method, parameters, reply_type):
+        try:
+            return self.bus.call_sync(
+                "org.fcitx.Fcitx5", "/controller", "org.fcitx.Fcitx.Controller1", method,
+                parameters, reply_type, Gio.DBusCallFlags.NONE, 5000, None)
+        except GLib.Error as error:
+            message = error.message or ""
+            if "ServiceUnknown" in message or "not provided by any" in message or "NameHasNoOwner" in message:
+                raise EngineError("fcitx5 沒有在執行。設定存在 fcitx5 行程裡，請先啟動 fcitx5。")
+            raise EngineError("fcitx5 有在執行，但拿不到這個外掛的設定。最常見的原因是外掛更新之後 fcitx5 還沒重新啟動，"
+                              f"載入的還是舊版；請重新啟動 fcitx5 再試。（fcitx5 的回應：{message}）")
+
+    def read(self):
+        """回傳 (全部設定的清單, 使用者資料夾)。"""
+        reply = self._call("GetConfig", GLib.Variant("(s)", (CONFIG_URI,)), GLib.VariantType("(va(sa(sssva{sv})))"))
+        values = reply.unpack()[0]
+        if not isinstance(values, dict) or "Json" not in values:
+            raise EngineError("外掛沒有提供設定清單。請確認 fcitx5 已經重新啟動、載入的是新版外掛。")
+        self.last_errors = values.get("Errors", "")
+        return json.loads(values["Json"]), values.get("UserDataDir", "")
+
+    def write(self, key, text):
+        """寫一項。成功回傳 None，被引擎拒絕回傳原因。"""
+        payload = GLib.Variant("a{sv}", {key: GLib.Variant("s", text)})
+        self._call("SetConfig", GLib.Variant("(sv)", (CONFIG_URI, payload)), None)
+        self.read()
+        for entry in filter(None, self.last_errors.split(";")):
+            name, _, code = entry.rpartition("=")
+            if name == key:
+                return WRITE_ERRORS.get(int(code), f"錯誤 {code}")
+        return None
+
+
+# ---------------------------------------------------------------------------
+# 命令列
+# ---------------------------------------------------------------------------
+def page_of():
+    return {key: page_id for page_id, _title, _intro, keys in PAGES for key in keys}
+
+
+def status_of(key, pages):
+    if pages.get(key) == "maconly":
+        return "無作用"
+    if key in NO_EFFECT:
+        return "無作用"
+    return "已驗證" if key in VERIFIED else "未驗證"
+
+
+def command_check(items, texts):
+    """分頁表、翻譯表跟引擎實際的設定對不對得起來。"""
+    pages = page_of()
+    engine_keys = [item["key"] for item in items]
+    problems = []
+    problems += [f"引擎有、分頁表沒有：{key}" for key in engine_keys if key not in pages]
+    problems += [f"分頁表有、引擎沒有：{key}" for key in pages if key not in engine_keys]
+    listed = [key for _id, _title, _intro, keys in PAGES for key in keys]
+    problems += [f"分頁表重複：{key}" for key in sorted(set(listed)) if listed.count(key) > 1]
+    for item in items:
+        if item["key"] not in EXTRA_TEXTS and not texts.lookup(item.get("texts", {}).get("title")):
+            problems.append(f"沒有標題：{item['key']}")
+        for option in item.get("options", []):
+            if str(option["label"]).startswith("i18n:") and texts.lookup(option["label"]) is None:
+                problems.append(f"選項沒有翻譯：{item['key']} = {option['value']}")
+    print(f"引擎的設定 {len(engine_keys)} 項，分頁表 {len(listed)} 項，翻譯表 {len(texts.table)} 條")
+    for problem in problems:
+        print("  " + problem)
+    print("結果：" + ("PASS" if not problems else f"FAIL（{len(problems)} 個問題）"))
+    return 0 if not problems else 1
+
+
+def run_command_line(arguments):
+    engine = Engine()
+    items, _folder = engine.read()
+    by_key = {item["key"]: item for item in items}
+    texts = Texts()
+    if arguments.check:
+        return command_check(items, texts)
+    if arguments.list:
+        pages = page_of()
+        titles = {page_id: title for page_id, title, _intro, _keys in PAGES}
+        for item in items:
+            page = titles.get(pages.get(item["key"]), "？")
+            print(f"{page}\t{status_of(item['key'], pages)}\t{item['key']}\t{to_text(item['type'], item['value'])}\t{texts.title(item)}")
+        return 0
+    if arguments.get:
+        if arguments.get not in by_key:
+            print(f"引擎沒有這一項：{arguments.get}", file=sys.stderr)
+            return 1
+        item = by_key[arguments.get]
+        print(to_text(item["type"], item["value"]))
+        return 0
+    if arguments.set:
+        key, separator, value = arguments.set.partition("=")
+        if not separator:
+            print("格式是 KEY=VALUE", file=sys.stderr)
+            return 2
+        problem = engine.write(key, value)
+        if problem:
+            print(f"{key}：{problem}", file=sys.stderr)
+            return 1
+        return 0
+    return None
+
+
+# ---------------------------------------------------------------------------
+# 視窗
+# ---------------------------------------------------------------------------
+STYLE = """
+.vg-row { padding: 10px 14px; }
+.vg-title { font-weight: 600; }
+.vg-description { font-size: 0.9em; opacity: 0.72; }
+.vg-key { font-size: 0.78em; opacity: 0.45; font-family: monospace; }
+.vg-badge { font-size: 0.78em; padding: 1px 7px; border-radius: 9px; }
+.vg-badge-ok { background: alpha(@theme_selected_bg_color, 0.22); }
+.vg-badge-off { background: alpha(#c0392b, 0.20); }
+.vg-banner { padding: 10px 14px; background: alpha(#c0392b, 0.18); }
+.vg-intro { opacity: 0.8; }
+.vg-status { padding: 4px 12px; font-size: 0.88em; opacity: 0.75; }
+"""
+
+
+def run_window(arguments):
+    gi.require_version("Gtk", "4.0")
+    gi.require_version("Gdk", "4.0")
+    from gi.repository import Gdk, Gtk
+
+    texts = Texts()
+
+    class Row:
+        """一項設定在畫面上的一列，以及它的控制元件。"""
+
+        def __init__(self, window, item, no_effect_reason, verified):
+            self.window = window
+            self.item = item
+            self.key = item["key"]
+            self.type = item["type"]
+            self.loading = False
+            self.search_text = " ".join([self.key, texts.title(item), texts.description(item)]).lower()
+
+            self.widget = Gtk.ListBoxRow(activatable=False, selectable=False)
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=18)
+            box.add_css_class("vg-row")
+            self.widget.set_child(box)
+
+            left = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3, hexpand=True, valign=Gtk.Align.CENTER)
+            heading = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            title = Gtk.Label(label=texts.title(item), xalign=0, wrap=True)
+            title.add_css_class("vg-title")
+            heading.append(title)
+            if no_effect_reason is not None:
+                heading.append(self.badge(Gtk, "這個版本無作用", "vg-badge-off"))
+            elif verified:
+                heading.append(self.badge(Gtk, "已驗證", "vg-badge-ok"))
+            left.append(heading)
+            description = texts.description(item)
+            if no_effect_reason:
+                description = (description + "\n" if description else "") + "⚠ " + no_effect_reason
+            if description:
+                label = Gtk.Label(label=description, xalign=0, wrap=True, selectable=False)
+                label.add_css_class("vg-description")
+                left.append(label)
+            key_label = Gtk.Label(label=self.key, xalign=0, selectable=True)
+            key_label.add_css_class("vg-key")
+            left.append(key_label)
+            box.append(left)
+
+            right = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6, valign=Gtk.Align.CENTER)
+            self.options = texts.options(item)
+            self.control = self.build_control(Gtk)
+            right.append(self.control)
+            self.reset = Gtk.Button(icon_name="edit-undo-symbolic", tooltip_text="回到預設值", has_frame=False)
+            self.reset.connect("clicked", lambda _button: self.apply(self.item["default"]))
+            right.append(self.reset)
+            box.append(right)
+            self.show_value(item["value"])
+
+        @staticmethod
+        def badge(Gtk, text, css_class):
+            label = Gtk.Label(label=text, valign=Gtk.Align.CENTER)
+            label.add_css_class("vg-badge")
+            label.add_css_class(css_class)
+            return label
+
+        def option_value(self, raw):
+            """引擎宣告成布林、但選項是 0／1 的那幾項，值要換算。"""
+            if self.type == "bool":
+                return bool(raw)
+            return raw
+
+        def build_control(self, Gtk):
+            if self.options:
+                self.kind = "dropdown"
+                control = Gtk.DropDown.new_from_strings([label for _value, label in self.options])
+                control.set_size_request(260, -1)
+                control.connect("notify::selected", self.on_dropdown)
+                return control
+            if self.type == "bool":
+                self.kind = "switch"
+                control = Gtk.Switch(valign=Gtk.Align.CENTER)
+                control.connect("notify::active", lambda switch, _spec: self.changed(switch.get_active()))
+                return control
+            if self.type in ("int", "double"):
+                self.kind = "spin"
+                low = self.item.get("min", -1_000_000)
+                high = self.item.get("max", 1_000_000)
+                control = Gtk.SpinButton.new_with_range(low, high, 1)
+                control.set_digits(0 if self.type == "int" else 2)
+                control.connect("value-changed", self.on_spin)
+                return control
+            self.kind = "entry"
+            control = Gtk.Entry(width_chars=28)
+            if self.type in ("array", "dict"):
+                control.set_tooltip_text("JSON 格式。按 Enter 套用。")
+            else:
+                control.set_tooltip_text("按 Enter 套用。")
+            control.connect("activate", self.on_entry)
+            return control
+
+        def on_dropdown(self, dropdown, _spec):
+            index = dropdown.get_selected()
+            if 0 <= index < len(self.options):
+                self.changed(self.option_value(self.options[index][0]))
+
+        def on_spin(self, spin):
+            self.changed(spin.get_value_as_int() if self.type == "int" else spin.get_value())
+
+        def on_entry(self, entry):
+            text = entry.get_text()
+            if self.type in ("array", "dict"):
+                try:
+                    value = json.loads(text)
+                except ValueError:
+                    self.window.say(f"「{texts.title(self.item)}」不是合法的 JSON，沒有套用。")
+                    self.show_value(self.item["value"])
+                    return
+            else:
+                value = text
+            self.changed(value)
+
+        def changed(self, value):
+            if not self.loading and value != self.item["value"]:
+                self.apply(value)
+
+        def apply(self, value):
+            self.window.write(self, value)
+
+        def show_value(self, value):
+            """把引擎回報的值畫上去（不觸發寫入）。"""
+            self.item["value"] = value
+            self.loading = True
+            if self.kind == "dropdown":
+                index = next((i for i, (raw, _label) in enumerate(self.options) if self.option_value(raw) == value), None)
+                # 目前的值不在選項裡時不選任何一個，免得看起來像是別的值。
+                self.control.set_selected(index if index is not None else 0xFFFFFFFF)
+            elif self.kind == "switch":
+                self.control.set_active(bool(value))
+            elif self.kind == "spin":
+                self.control.set_value(value)
+            else:
+                self.control.set_text(to_text(self.type, value) if self.type in ("array", "dict") else str(value))
+            self.loading = False
+            self.reset.set_sensitive(value != self.item["default"])
+
+    class Window(Gtk.ApplicationWindow):
+        def __init__(self, application):
+            super().__init__(application=application, title=WINDOW_TITLE)
+            self.set_default_size(1000, 700)
+            self.engine = None
+            self.rows = {}
+            self.lists = []
+
+            provider = Gtk.CssProvider()
+            provider.load_from_data(STYLE.encode())
+            Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider,
+                                                      Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+            header = Gtk.HeaderBar()
+            self.search = Gtk.SearchEntry(placeholder_text="搜尋設定", width_chars=26)
+            self.search.connect("search-changed", self.on_search)
+            header.pack_end(self.search)
+            reload_button = Gtk.Button(icon_name="view-refresh-symbolic", tooltip_text="重新讀取")
+            reload_button.connect("clicked", lambda _button: self.reload())
+            header.pack_start(reload_button)
+            self.set_titlebar(header)
+
+            outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            self.set_child(outer)
+
+            self.banner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12, visible=False)
+            self.banner.add_css_class("vg-banner")
+            self.banner_label = Gtk.Label(xalign=0, wrap=True, hexpand=True)
+            self.banner.append(self.banner_label)
+            retry = Gtk.Button(label="重試")
+            retry.connect("clicked", lambda _button: self.reload())
+            self.banner.append(retry)
+            outer.append(self.banner)
+
+            body = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, vexpand=True)
+            self.stack = Gtk.Stack(hexpand=True)
+            sidebar = Gtk.StackSidebar(stack=self.stack)
+            sidebar.set_size_request(170, -1)
+            body.append(sidebar)
+            body.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
+            body.append(self.stack)
+            outer.append(body)
+
+            outer.append(Gtk.Separator())
+            self.status = Gtk.Label(xalign=0, wrap=True)
+            self.status.add_css_class("vg-status")
+            outer.append(self.status)
+
+            self.reload()
+
+        def say(self, message):
+            self.status.set_label(message)
+
+        def fail(self, message):
+            self.banner_label.set_label(message)
+            self.banner.set_visible(True)
+
+        def reload(self):
+            """重新向引擎要全部的設定。第一次會把頁面建出來，之後只更新數值。"""
+            try:
+                self.engine = self.engine or Engine()
+                items, folder = self.engine.read()
+            except EngineError as error:
+                self.fail(str(error))
+                self.say("沒有連上引擎。")
+                return False
+            self.banner.set_visible(False)
+            if not self.rows:
+                self.build_pages(items, folder)
+            else:
+                for item in items:
+                    if item["key"] in self.rows:
+                        self.rows[item["key"]].show_value(item["value"])
+            self.say(f"已連上引擎，共 {len(items)} 項設定。改動會立刻生效並存檔。")
+            return True
+
+        def build_pages(self, items, folder):
+            by_key = {item["key"]: item for item in items}
+            pages = [(page_id, title, intro, [key for key in keys if key in by_key])
+                     for page_id, title, intro, keys in PAGES]
+            # 引擎之後新增、分頁表還不認得的設定，集中放在最後一頁，不會漏掉。
+            leftovers = [item["key"] for item in items if item["key"] not in page_of()]
+            if leftovers:
+                pages.append(("other", "其他", "引擎有、這個設定程式還沒有分類的設定。", leftovers))
+
+            for page_id, title, intro, keys in pages:
+                content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12,
+                                  margin_top=18, margin_bottom=18, margin_start=22, margin_end=22)
+                intro_label = Gtk.Label(label=intro, xalign=0, wrap=True)
+                intro_label.add_css_class("vg-intro")
+                content.append(intro_label)
+
+                listbox = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE, show_separators=True)
+                listbox.add_css_class("frame")
+                listbox.set_filter_func(self.filter_row)
+                for key in keys:
+                    reason = None
+                    if page_id == "maconly":
+                        reason = ""
+                    elif key in NO_EFFECT:
+                        reason = NO_EFFECT[key]
+                    row = Row(self, by_key[key], reason, key in VERIFIED)
+                    row.widget.vg_row = row
+                    self.rows[key] = row
+                    listbox.append(row.widget)
+                self.lists.append(listbox)
+                content.append(listbox)
+
+                if page_id == "lexicon":
+                    content.append(self.folder_section(folder))
+
+                scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
+                scroller.set_child(content)
+                self.stack.add_titled(scroller, page_id, f"{title}（{len(keys)}）")
+
+        def folder_section(self, folder):
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+            label = Gtk.Label(xalign=0, wrap=True, hexpand=True, selectable=True,
+                              label=f"使用者語彙與選字記憶存放的資料夾：\n{folder or '（引擎沒有回報）'}\n"
+                                    "用別的編輯器改了裡面的檔案，要重新啟動 fcitx5 才會生效。")
+            label.add_css_class("vg-description")
+            box.append(label)
+            button = Gtk.Button(label="開啟資料夾", valign=Gtk.Align.CENTER, sensitive=bool(folder))
+            button.connect("clicked", lambda _button: subprocess.Popen(["xdg-open", folder]))
+            box.append(button)
+            return box
+
+        def filter_row(self, list_row):
+            needle = self.search.get_text().strip().lower()
+            return not needle or needle in list_row.vg_row.search_text
+
+        def on_search(self, _entry):
+            for listbox in self.lists:
+                listbox.invalidate_filter()
+
+        def write(self, row, value):
+            try:
+                problem = self.engine.write(row.key, to_text(row.type, value))
+                items, _folder = self.engine.read()
+            except EngineError as error:
+                self.fail(str(error))
+                row.show_value(row.item["value"])
+                return
+            # 引擎可能會把不合理的值改掉，或連帶調整別項，所以整份重讀。
+            for item in items:
+                if item["key"] in self.rows:
+                    self.rows[item["key"]].show_value(item["value"])
+            title = texts.title(row.item)
+            if problem:
+                self.say(f"「{title}」沒有套用：{problem}。")
+            elif row.item["value"] != value:
+                self.say(f"「{title}」的值被引擎改成 {to_text(row.type, row.item['value'])}（送出的值不被接受）。")
+            else:
+                self.say(f"已套用「{title}」。")
+
+    class Application(Gtk.Application):
+        def __init__(self):
+            super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.NON_UNIQUE if arguments.self_test else 0)
+            self.exit_code = 0
+
+        def do_activate(self):
+            window = self.props.active_window or Window(self)
+            window.present()
+            if arguments.self_test:
+                GLib.timeout_add(600, self.finish_self_test, window)
+
+        def finish_self_test(self, window):
+            """不需要人看的檢查：視窗建得起來、每一項設定都有一列。"""
+            expected = len(window.engine.read()[0]) if window.engine and window.rows else 0
+            print(f"視窗建立：{len(window.rows)} 列，引擎 {expected} 項，分頁 {len(window.lists)} 頁")
+            ok = expected > 0 and len(window.rows) == expected
+            if ok and arguments.screenshot:
+                # 畫不出來不算失敗：有些顯示後端沒有畫面可以擷取。
+                self.screenshot(window, arguments.screenshot)
+            print("結果：" + ("PASS" if ok else "FAIL"))
+            self.exit_code = 0 if ok else 1
+            self.quit()
+            return False
+
+        @staticmethod
+        def screenshot(window, prefix):
+            """把每一頁畫成 PNG，方便不在螢幕前也能檢查版面。"""
+            page_ids = [page_id for page_id, _t, _i, _k in PAGES]
+            renderer = window.get_native().get_renderer()
+            for page_id in page_ids:
+                window.stack.set_visible_child_name(page_id)
+                context = GLib.MainContext.default()
+                for _ in range(200):
+                    context.iteration(False)
+                target = window.get_child()
+                width, height = target.get_width() or 1000, target.get_height() or 660
+                paintable = Gtk.WidgetPaintable.new(target)
+                snapshot = Gtk.Snapshot()
+                paintable.snapshot(snapshot, width, height)
+                node = snapshot.to_node()
+                if node is None or renderer is None:
+                    print(f"畫不出畫面（{width}x{height}，這個顯示後端不支援）")
+                    return False
+                renderer.render_texture(node, None).save_to_png(f"{prefix}-{page_id}.png")
+            print(f"畫面存到 {prefix}-*.png")
+            return True
+
+    application = Application()
+    application.run(None)
+    return application.exit_code
+
+
+def main():
+    parser = argparse.ArgumentParser(description="fcitx5-vanguard 設定程式")
+    parser.add_argument("--list", action="store_true", help="列出全部設定與目前的值")
+    parser.add_argument("--get", metavar="KEY", help="讀一項")
+    parser.add_argument("--set", metavar="KEY=VALUE", help="寫一項")
+    parser.add_argument("--check", action="store_true", help="檢查分頁表與翻譯表有沒有漏")
+    parser.add_argument("--self-test", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--screenshot", metavar="PREFIX", help=argparse.SUPPRESS)
+    arguments = parser.parse_args()
+
+    if arguments.list or arguments.get or arguments.set or arguments.check:
+        try:
+            return run_command_line(arguments)
+        except EngineError as error:
+            print(str(error), file=sys.stderr)
+            return 1
+    return run_window(arguments)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

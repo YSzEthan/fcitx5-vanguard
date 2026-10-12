@@ -35,6 +35,11 @@ modules:
       - type: dir
         path: ../../addon
         dest: addon
+      # 設定程式會一起裝進擴充，但沙盒裡沒有 GTK 4 的 Python 綁定，跑不起來；
+      # flatpak 的使用者要另外從沙盒外面執行它（見 packaging/flatpak-local/install.sh 的做法）。
+      - type: dir
+        path: ../../settings
+        dest: settings
       - type: archive
         path: ../../dist/fcitx5-vanguard-engine-0.1.0-x86_64.tar.zst
         dest: engine

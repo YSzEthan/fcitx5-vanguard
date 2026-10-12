@@ -20,4 +20,9 @@ fcitx5 外掛本體（vanguard.so）與 C 介面層（libVGEngine.so）
   授權：LGPL-3.0-or-later
   全文：@LICENSES@/fcitx5-vanguard/
 
+設定程式的介面文字（settings/zh-Hant.strings）
+  來源：https://github.com/vChewing/vChewing-macOS
+  授權：MulanPSL-2.0
+  全文：@LICENSES@/vChewing-macOS-strings/
+
 各二進位檔對應的原始碼版本記在 @LICENSES@/SOURCES.txt 。

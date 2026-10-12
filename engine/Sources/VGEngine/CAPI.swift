@@ -349,30 +349,38 @@ nonisolated public func vgPrefGet(_ key: UnsafePointer<CChar>) -> UnsafeMutableP
   return text.flatMap(duplicate)
 }
 
-/// 寫一項偏好設定並立刻存檔。value 會依照這一項目前的型別解讀。
-/// 回傳 0 成功；1 不認得的 key；2 value 的格式跟這一項的型別不合。
+/// 寫一項偏好設定並立刻存檔。value 依照這一項在引擎裡宣告的型別解讀：
+/// 布林 "true"／"false"、整數、小數、字串原文；字串陣列與字典用 JSON。
+/// 回傳 0 成功；1 不認得的 key；2 value 的格式跟型別不合；3 整數超出這一項允許的範圍。
 @_cdecl("vg_pref_set")
 nonisolated public func vgPrefSet(_ key: UnsafePointer<CChar>, _ value: UnsafePointer<CChar>) -> Int32 {
   let key = String(cString: key)
   let text = String(cString: value)
   return mainSync {
     let defaults = UserDefaults.standard
-    guard UserDef(rawValue: key) != nil, let current = defaults.object(forKey: key) else { return 1 }
-    switch current {
-    case is Bool:
+    guard let userDef = UserDef(rawValue: key) else { return 1 }
+    switch userDef.dataType {
+    case .bool:
       guard let parsed = Bool(text) else { return 2 }
       defaults.set(parsed, forKey: key)
-    case is Int:
+    case .integer:
       guard let parsed = Int(text) else { return 2 }
+      if let range = userDef.validNumeralValueRange, !range.contains(parsed) { return 3 }
       defaults.set(parsed, forKey: key)
-    case is Double:
+    case .double:
       guard let parsed = Double(text) else { return 2 }
       defaults.set(parsed, forKey: key)
-    case is String:
+    case .string:
       defaults.set(text, forKey: key)
-    default:
-      return 2
+    case .arrayOfStrings:
+      guard let parsed = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String] else { return 2 }
+      defaults.set(parsed, forKey: key)
+    case .dictionary:
+      guard let parsed = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Bool] else { return 2 }
+      defaults.set(parsed, forKey: key)
     }
+    // 引擎自己的檢查：不合理的值（例如空的選字鍵）會被改回預設。
+    PrefMgr.sharedSansDidSetOps.fixOddPreferencesCore()
     defaults.synchronize()
     // 讓語言模型與鍵盤排列跟上新的設定，並丟掉打到一半的內容。
     SessionHost.shared.syncLMPrefs()
@@ -380,4 +388,63 @@ nonisolated public func vgPrefSet(_ key: UnsafePointer<CChar>, _ value: UnsafePo
     Engine.shared?.session?.inputHandler?.ensureKeyboardParser()
     return 0
   }
+}
+
+/// 列出引擎全部的偏好設定，JSON 陣列，順序同引擎的宣告順序。每一項：
+/// `key`、`type`（bool／int／double／string／array／dict）、`default`、`value`（目前的值），
+/// 整數另有 `min`、`max`（有範圍限制時）與 `options`（引擎宣告為選單的那些值與標籤）；
+/// `texts` 是介面文字（標題、說明等）在翻譯表裡的 key。
+/// 回傳值要用 vg_free() 釋放。
+@_cdecl("vg_pref_describe")
+nonisolated public func vgPrefDescribe() -> UnsafeMutablePointer<CChar>? {
+  let json: String = mainSync {
+    let defaults = UserDefaults.standard
+    let items: [[String: Any]] = UserDef.allCases.map { userDef in
+      var item: [String: Any] = ["key": userDef.rawValue]
+      let type: String
+      switch userDef.dataType {
+      case .bool: type = "bool"
+      case .integer: type = "int"
+      case .double: type = "double"
+      case .string: type = "string"
+      case .arrayOfStrings: type = "array"
+      case .dictionary: type = "dict"
+      }
+      item["type"] = type
+      item["default"] = userDef.dataType.defaultValue
+      item["value"] = defaults.object(forKey: userDef.rawValue) ?? userDef.dataType.defaultValue
+      if let range = userDef.validNumeralValueRange {
+        item["min"] = range.lowerBound
+        item["max"] = range.upperBound
+      }
+      // 介面文字：引擎給的是翻譯表的 key（「i18n:…」），翻譯表在 macOS 版的 app 裡。
+      // 這裡原樣交出去，由設定程式拿它附帶的翻譯表去對。
+      if let meta = userDef.metaData {
+        var texts = [String: String]()
+        texts["title"] = meta.shortTitle
+        texts["description"] = meta.description
+        texts["prompt"] = meta.prompt
+        texts["inlinePrompt"] = meta.inlinePrompt
+        texts["popupPrompt"] = meta.popupPrompt
+        texts["toolTip"] = meta.toolTip
+        item["texts"] = texts
+        if let options = meta.options {
+          item["options"] = options.keys.sorted().map { ["value": $0, "label": options[$0] ?? ""] as [String: Any] }
+        }
+      }
+      // 鍵盤排列的選項不在偏好設定的中繼資料裡，而是另一個列舉。
+      let parsers: [KeyboardParser]? = switch userDef {
+      case .kKeyboardParser4Zhuyin: KeyboardParser.allCases.filter { $0.rawValue < 100 }
+      case .kKeyboardParser4Pinyin: KeyboardParser.allCases.filter { $0.rawValue >= 100 }
+      default: nil
+      }
+      if let parsers {
+        item["options"] = parsers.map { ["value": $0.rawValue, "label": $0.localizedMenuName] as [String: Any] }
+      }
+      return item
+    }
+    let data = (try? JSONSerialization.data(withJSONObject: items, options: [.sortedKeys])) ?? Data("[]".utf8)
+    return String(decoding: data, as: UTF8.self)
+  }
+  return duplicate(json)
 }

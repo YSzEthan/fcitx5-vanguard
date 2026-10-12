@@ -15,7 +15,8 @@ arch=('x86_64')
 url='https://github.com/vChewing/vChewing-LibVanguard'
 # 本專案自己的程式碼與引擎 LGPL-3.0-or-later、辭庫 MulanPSL-2.0、Swift 執行期 Apache-2.0 WITH Swift-exception。
 license=('LGPL-3.0-or-later' 'MulanPSL-2.0' 'Apache-2.0 WITH Swift-exception')
-depends=('fcitx5' 'glibc' 'gcc-libs')
+# python-gobject 與 gtk4 是設定程式（fcitx5-vanguard-settings）要的。
+depends=('fcitx5' 'glibc' 'gcc-libs' 'python' 'python-gobject' 'gtk4')
 makedepends=('cmake' 'ninja')
 # 引擎目錄裡的函式庫已經 strip 過，維持跟測試時一模一樣的位元組；外掛本體由 cmake --install --strip 處理。
 options=('!strip' '!debug')

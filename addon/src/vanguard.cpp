@@ -58,6 +58,16 @@ FCITX_CONFIGURATION(
     fcitx::Option<bool> shiftRight{this, "ToggleWithRightShift", "單獨按一下右 Shift 切換中英", true};
     fcitx::Option<bool> shiftNotice{this, "ShowNoticeWhenToggling", "切換中英時顯示提示", true};);
 
+// 給獨立設定程式（settings/）用的通道，掛在 fcitx://config/addon/vanguard/prefs。
+// 讀：Json 是引擎全部偏好設定的清單（vg_pref_describe 的輸出），Errors 是上一次寫入被拒絕的項目。
+// 寫：送來的每一組「key = 值」直接交給 vg_pref_set；key 用引擎的 UserDef 名稱。
+// 這條通道不會出現在 fcitx5 自己的設定視窗裡。
+FCITX_CONFIGURATION(
+    VanguardPrefsConfig,
+    fcitx::Option<std::string> json{this, "Json", "All engine preferences as JSON", "[]"};
+    fcitx::Option<std::string> errors{this, "Errors", "Keys rejected by the last write", ""};
+    fcitx::Option<std::string> userDataDir{this, "UserDataDir", "Folder holding user phrases", ""};);
+
 // 設定視窗的選項對應到引擎的哪個偏好設定。
 constexpr const char *kPrefHorizontal = "UseHorizontalCandidateList";
 constexpr const char *kPrefCandidateKeys = "CandidateKeys";
@@ -125,6 +135,7 @@ public:
             return;
         }
         ready_ = true;
+        userDataDir_ = userData;
         VANGUARD_INFO() << "engine started, textmap=" << textMap << ", userdata=" << userData;
         pump();
 
@@ -218,6 +229,28 @@ public:
         vg_pref_set(kPrefShiftLeft, *config_.shiftLeft ? "true" : "false");
         vg_pref_set(kPrefShiftRight, *config_.shiftRight ? "true" : "false");
         vg_pref_set(kPrefShiftNotice, *config_.shiftNotice ? "true" : "false");
+        dirty_ = true;
+        pump();
+    }
+
+    const fcitx::Configuration *getSubConfig(const std::string &path) const override {
+        if (path != "prefs" || !ready_) return nullptr;
+        prefsConfig_.json.setValue(takeString(vg_pref_describe()));
+        prefsConfig_.errors.setValue(prefErrors_);
+        prefsConfig_.userDataDir.setValue(userDataDir_);
+        return &prefsConfig_;
+    }
+
+    void setSubConfig(const std::string &path, const fcitx::RawConfig &raw) override {
+        if (path != "prefs" || !ready_) return;
+        prefErrors_.clear();
+        for (const auto &key : raw.subItems()) {
+            const auto item = raw.get(key);
+            if (!item) continue;
+            const int32_t rc = vg_pref_set(key.c_str(), item->value().c_str());
+            // 1 不認得的 key、2 格式不合、3 超出範圍；記下來讓設定程式下次讀取時知道。
+            if (rc != 0) prefErrors_ += key + "=" + std::to_string(rc) + ";";
+        }
         dirty_ = true;
         pump();
     }
@@ -370,6 +403,9 @@ private:
     bool lexiconReported_ = false;
     int pendingPage_ = 0;
     mutable VanguardConfig config_;
+    mutable VanguardPrefsConfig prefsConfig_;
+    std::string prefErrors_;
+    std::string userDataDir_;
     fcitx::KeySym shiftDown_ = FcitxKey_None;
     uint64_t shiftDownAt_ = 0;
     // 引擎目前在服務的輸入情境。第一版所有情境共用一個引擎 session。

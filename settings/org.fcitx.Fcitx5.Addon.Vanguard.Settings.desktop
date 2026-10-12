@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Vanguard Bopomofo Settings
+Name[zh_TW]=Vanguard 注音設定
+Comment=Preferences for the Vanguard Bopomofo input method
+Comment[zh_TW]=Vanguard 注音輸入法的偏好設定
+Exec=fcitx5-vanguard-settings
+Icon=preferences-desktop-keyboard
+Categories=Settings;
+Keywords=fcitx;input method;bopomofo;zhuyin;注音;輸入法;
+StartupNotify=true

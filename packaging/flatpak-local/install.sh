@@ -16,6 +16,7 @@ APP=org.fcitx.Fcitx5
 DATA="${VANGUARD_FLATPAK_DATA:-$HOME/.var/app/$APP/data}"
 PREFIX="$HOME/.var/app/$APP/data/fcitx5-vanguard"   # 辭庫路徑會編進外掛，所以這個位置是固定的
 STAGE="$ROOT/dist/flatpak-local"
+DESKTOP_FILE="$HOME/.local/share/applications/org.fcitx.Fcitx5.Addon.Vanguard.Settings.desktop"
 
 write_conf() { # $1 = 資料目錄（裡面有 fcitx5/）
   mkdir -p "$1/fcitx5/addon" "$1/fcitx5/inputmethod"
@@ -43,13 +44,19 @@ case "$1" in
     # 登記檔改放在 fcitx5 的使用者資料目錄，前綴裡那兩份用不到。
     rm -rf "$PREFIX/share/fcitx5"
     write_conf "$DATA"
+    # 設定程式在沙盒外面用主機的 python3 與 GTK 4 執行，經 session bus 連到沙盒裡的 fcitx5。
+    # 前綴裡那份 .desktop 主機的選單看不到，所以另外寫一份到使用者的應用程式目錄。
+    mkdir -p "$HOME/.local/share/applications"
+    sed "s|^Exec=.*|Exec=$PREFIX/bin/fcitx5-vanguard-settings|" \
+      "$ROOT/settings/org.fcitx.Fcitx5.Addon.Vanguard.Settings.desktop" > "$DESKTOP_FILE"
     echo "已安裝到 $PREFIX"
+    echo "設定程式：應用程式選單裡的「Vanguard 注音設定」，或直接執行 $PREFIX/bin/fcitx5-vanguard-settings"
     echo "登記檔：$DATA/fcitx5/addon/vanguard.conf、$DATA/fcitx5/inputmethod/vanguard.conf"
     echo "接著重新啟動 Fcitx5，再到 Fcitx5 設定把「Vanguard 注音」加進輸入法清單。"
     ;;
   uninstall)
     rm -rf "$PREFIX"
-    rm -f "$DATA/fcitx5/addon/vanguard.conf" "$DATA/fcitx5/inputmethod/vanguard.conf"
+    rm -f "$DATA/fcitx5/addon/vanguard.conf" "$DATA/fcitx5/inputmethod/vanguard.conf" "$DESKTOP_FILE"
     rmdir "$DATA/fcitx5/addon" "$DATA/fcitx5/inputmethod" 2>/dev/null || true
     echo "已移除。使用者語彙與選字記憶還在 $DATA/fcitx5/vanguard，偏好設定在 $HOME/.var/app/$APP/config/fcitx5.plist。"
     echo "如果已經把輸入法加進清單，請到 Fcitx5 設定把它移掉，再重新啟動 Fcitx5。"

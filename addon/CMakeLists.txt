@@ -45,6 +45,15 @@ install(DIRECTORY "${VANGUARD_ENGINE_BUNDLE}/lib/" DESTINATION "${VANGUARD_PRIVA
         FILES_MATCHING PATTERN "*.so")
 install(DIRECTORY "${VANGUARD_ENGINE_BUNDLE}/share/" DESTINATION "${VANGUARD_DATADIR}")
 install(DIRECTORY "${VANGUARD_ENGINE_BUNDLE}/licenses/" DESTINATION "${VANGUARD_DATADIR}/licenses")
+# 獨立的設定程式（Python + GTK 4）與它用的翻譯表。
+set(VANGUARD_SETTINGS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../settings")
+install(PROGRAMS "${VANGUARD_SETTINGS_DIR}/fcitx5-vanguard-settings" DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install(FILES "${VANGUARD_SETTINGS_DIR}/strings/zh-Hant.strings" DESTINATION "${VANGUARD_DATADIR}/settings")
+install(FILES "${VANGUARD_SETTINGS_DIR}/strings/LICENSE.txt" "${VANGUARD_SETTINGS_DIR}/strings/README.md"
+        DESTINATION "${VANGUARD_DATADIR}/licenses/vChewing-macOS-strings")
+install(FILES "${VANGUARD_SETTINGS_DIR}/org.fcitx.Fcitx5.Addon.Vanguard.Settings.desktop"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
+
 install(FILES data/vanguard-addon.conf RENAME vanguard.conf
         DESTINATION "${CMAKE_INSTALL_DATADIR}/fcitx5/addon")
 install(FILES data/vanguard-im.conf RENAME vanguard.conf

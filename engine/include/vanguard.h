@@ -83,8 +83,12 @@ void vg_candidate_select(int32_t index);
 // 偏好設定。key 是上游 UserDef 的名稱（例如 "CandidateKeys"、"KeyboardParser4Zhuyin"）。
 // 讀：轉成字串回傳（布林值是 "true"／"false"），不認得的 key 回傳 NULL；要用 vg_free() 釋放。
 char *vg_pref_get(const char *key);
-// 寫：value 依這一項目前的型別解讀，並立刻存檔。回傳 0 成功；1 不認得的 key；2 格式不合。
+// 寫：value 依這一項在引擎裡宣告的型別解讀（字串陣列與字典用 JSON），並立刻存檔。
+// 回傳 0 成功；1 不認得的 key；2 格式不合；3 整數超出允許的範圍。
 int32_t vg_pref_set(const char *key, const char *value);
+// 列出全部偏好設定：JSON 陣列，每一項有 key、type（bool／int／double／string／array／dict）、
+// default、value，整數另有 min、max、options（有的話）。要用 vg_free() 釋放。
+char *vg_pref_describe(void);
 
 void vg_free(char *string);
 
