@@ -1,7 +1,6 @@
 # 每次 push：編引擎、跑測試、做 deb，再把外掛做成 flatpak 版 Fcitx5 的擴充。
 # 產物掛在該次執行的 Artifacts：引擎 tarball、deb、fcitx5-vanguard.flatpak。
 #
-# 注意：這份流程寫好時專案還沒有遠端 repo，**還沒有實際跑過**。第一次跑大概需要修。
 name: build
 
 on:
@@ -19,7 +18,7 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends \
-            patchelf zstd cmake ninja-build \
+            patchelf zstd cmake ninja-build libcurl4-openssl-dev \
             fcitx5 libfcitx5core-dev libfcitx5utils-dev libfcitx5config-dev fcitx5-modules-dev \
             dbus dbus-daemon python3-dbus python3-gi
 
