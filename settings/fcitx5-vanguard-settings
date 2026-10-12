@@ -134,7 +134,7 @@ VERIFIED = {
     "UseHorizontalCandidateList", "CandidateKeys", "MixedAlphanumericalEnabled",
     "TogglingAlphanumericalModeWithLShift", "TogglingAlphanumericalModeWithRShift",
     "ShowNotificationsWhenTogglingShift", "UpperCaseLetterKeyBehavior", "BypassNonAppleCapsLockHandling",
-    "FetchSuggestionsFromPerceptionOverrideModel", "KeyboardParser4Zhuyin",
+    "SpaceKeyBehaviorAgainstICB", "KeyboardParser4Zhuyin",
 }
 
 # 已知在這個版本沒有作用的，以及原因。「macOS 專用」那一頁整頁都算，不必列在這裡。
