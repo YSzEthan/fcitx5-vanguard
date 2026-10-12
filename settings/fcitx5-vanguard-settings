@@ -16,6 +16,8 @@
   fcitx5-vanguard-settings --get KEY
   fcitx5-vanguard-settings --set KEY=VALUE
   fcitx5-vanguard-settings --check      檢查分頁表與翻譯表有沒有漏掉引擎的設定
+
+引擎共 119 項設定，其中 26 項是 macOS 專用、在這裡沒有作用，不顯示（見 HIDDEN）。
 """
 import argparse
 import json
@@ -92,21 +94,39 @@ PAGES = [
         "UsingHotKeyPinyinZhuyinTypingSwitch", "UsingHotKeyHalfWidthPunctuation",
         "UsingHotKeyCurrencyNumerals", "UsingHotKeyCassette", "UsingHotKeyRevLookup", "UsingHotKeyInputMode",
     ]),
-    ("maconly", "macOS 專用", "這些設定管的是 macOS 版自己畫的視窗、音效、系統整合等。"
-     "這個版本沒有對應的東西，改了會存進引擎，但不會有任何效果。列在這裡是為了完整。", [
-        "CandidateListTextSize", "CandidateTextFontName", "CandidateWindowShowOnlyOneLine",
-        "AlwaysExpandCandidateWindow", "EnforceSingleLineCandidateWindowLayout4SCPC",
-        "MinCellWidthForHorizontalMatrix", "UseDynamicCandidateWindowOrigin", "EnableCandidateWindowAnimation",
-        "RespectClientAccentColor", "PopupCompositionBufferTextSize", "AlwaysUsePCBWithElectronBasedClients",
-        "SecurityHardenedCompositionBuffer", "ClientsIMKTextInputIncapable",
-        "DisableSegmentedThickUnderlineInMarkingModeForManagedClients", "AlwaysShowTooltipTextsHorizontally",
-        "OverrideNotifyUIColorScheme", "BeepSoundPreference", "ShouldNotFartInLieuOfBeep",
-        "ReadingNarrationCoverage", "CandidateNarrationToggleType",
-        "BasicKeyboardLayout", "AlphanumericalKeyboardLayout", "AppleLanguages",
-        "CheckUpdateAutomatically", "CheckAbusersOfSecureEventInputAPI",
-        "PhraseEditorAutoReloadExternalModifications",
-    ]),
     ("debug", "偵錯", "開發與除錯用。", ["_DebugMode", "_FailureFlag_POMObservation"]),
+]
+
+# macOS 專用的設定：管的是 macOS 版自己畫的視窗、音效、系統整合等，這個版本沒有對應的東西，
+# 改了也不會有任何效果。使用者決定不顯示（2026-10-12）。它們仍然存在於引擎裡，
+# --get／--set 指定 key 還是讀寫得到；列在這裡是為了讓 --check 知道這些 key 沒有被漏掉。
+HIDDEN = [
+    "CandidateListTextSize",
+    "CandidateTextFontName",
+    "CandidateWindowShowOnlyOneLine",
+    "AlwaysExpandCandidateWindow",
+    "EnforceSingleLineCandidateWindowLayout4SCPC",
+    "MinCellWidthForHorizontalMatrix",
+    "UseDynamicCandidateWindowOrigin",
+    "EnableCandidateWindowAnimation",
+    "RespectClientAccentColor",
+    "PopupCompositionBufferTextSize",
+    "AlwaysUsePCBWithElectronBasedClients",
+    "SecurityHardenedCompositionBuffer",
+    "ClientsIMKTextInputIncapable",
+    "DisableSegmentedThickUnderlineInMarkingModeForManagedClients",
+    "AlwaysShowTooltipTextsHorizontally",
+    "OverrideNotifyUIColorScheme",
+    "BeepSoundPreference",
+    "ShouldNotFartInLieuOfBeep",
+    "ReadingNarrationCoverage",
+    "CandidateNarrationToggleType",
+    "BasicKeyboardLayout",
+    "AlphanumericalKeyboardLayout",
+    "AppleLanguages",
+    "CheckUpdateAutomatically",
+    "CheckAbusersOfSecureEventInputAPI",
+    "PhraseEditorAutoReloadExternalModifications",
 ]
 
 # 引擎沒有給標題的幾項（macOS 版把它們放在選單或別的地方），這裡自己補。
@@ -137,7 +157,7 @@ VERIFIED = {
     "SpaceKeyBehaviorAgainstICB", "KeyboardParser4Zhuyin",
 }
 
-# 已知在這個版本沒有作用的，以及原因。「macOS 專用」那一頁整頁都算，不必列在這裡。
+# 有顯示、但已知在這個版本沒有作用的，以及原因。
 NO_EFFECT = {
     "KanjiConversionPreferences": "這個版本沒有接上漢字轉換器。",
     "UserDataFolderSpecified": "這個版本的使用者資料夾位置是固定的（見本頁下方）。",
@@ -295,8 +315,6 @@ def page_of():
 
 
 def status_of(key, pages):
-    if pages.get(key) == "maconly":
-        return "無作用"
     if key in NO_EFFECT:
         return "無作用"
     return "已驗證" if key in VERIFIED else "未驗證"
@@ -307,9 +325,10 @@ def command_check(items, texts):
     pages = page_of()
     engine_keys = [item["key"] for item in items]
     problems = []
-    problems += [f"引擎有、分頁表沒有：{key}" for key in engine_keys if key not in pages]
+    problems += [f"引擎有、分頁表與隱藏清單都沒有：{key}" for key in engine_keys if key not in pages and key not in HIDDEN]
     problems += [f"分頁表有、引擎沒有：{key}" for key in pages if key not in engine_keys]
-    listed = [key for _id, _title, _intro, keys in PAGES for key in keys]
+    problems += [f"隱藏清單有、引擎沒有：{key}" for key in HIDDEN if key not in engine_keys]
+    listed = [key for _id, _title, _intro, keys in PAGES for key in keys] + HIDDEN
     problems += [f"分頁表重複：{key}" for key in sorted(set(listed)) if listed.count(key) > 1]
     for item in items:
         if item["key"] not in EXTRA_TEXTS and not texts.lookup(item.get("texts", {}).get("title")):
@@ -317,7 +336,8 @@ def command_check(items, texts):
         for option in item.get("options", []):
             if str(option["label"]).startswith("i18n:") and texts.lookup(option["label"]) is None:
                 problems.append(f"選項沒有翻譯：{item['key']} = {option['value']}")
-    print(f"引擎的設定 {len(engine_keys)} 項，分頁表 {len(listed)} 項，翻譯表 {len(texts.table)} 條")
+    print(f"引擎的設定 {len(engine_keys)} 項：顯示 {len(listed) - len(HIDDEN)} 項、隱藏（macOS 專用）{len(HIDDEN)} 項；"
+          f"翻譯表 {len(texts.table)} 條")
     for problem in problems:
         print("  " + problem)
     print("結果：" + ("PASS" if not problems else f"FAIL（{len(problems)} 個問題）"))
@@ -335,6 +355,8 @@ def run_command_line(arguments):
         pages = page_of()
         titles = {page_id: title for page_id, title, _intro, _keys in PAGES}
         for item in items:
+            if item["key"] in HIDDEN:
+                continue
             page = titles.get(pages.get(item["key"]), "？")
             print(f"{page}\t{status_of(item['key'], pages)}\t{item['key']}\t{to_text(item['type'], item['value'])}\t{texts.title(item)}")
         return 0
@@ -590,7 +612,7 @@ def run_window(arguments):
                 for item in items:
                     if item["key"] in self.rows:
                         self.rows[item["key"]].show_value(item["value"])
-            self.say(f"已連上引擎，共 {len(items)} 項設定。改動會立刻生效並存檔。")
+            self.say(f"已連上引擎，共 {len(self.rows)} 項設定。改動會立刻生效並存檔。")
             return True
 
         def build_pages(self, items, folder):
@@ -598,7 +620,7 @@ def run_window(arguments):
             pages = [(page_id, title, intro, [key for key in keys if key in by_key])
                      for page_id, title, intro, keys in PAGES]
             # 引擎之後新增、分頁表還不認得的設定，集中放在最後一頁，不會漏掉。
-            leftovers = [item["key"] for item in items if item["key"] not in page_of()]
+            leftovers = [item["key"] for item in items if item["key"] not in page_of() and item["key"] not in HIDDEN]
             if leftovers:
                 pages.append(("other", "其他", "引擎有、這個設定程式還沒有分類的設定。", leftovers))
 
@@ -613,11 +635,7 @@ def run_window(arguments):
                 listbox.add_css_class("frame")
                 listbox.set_filter_func(self.filter_row)
                 for key in keys:
-                    reason = None
-                    if page_id == "maconly":
-                        reason = ""
-                    elif key in NO_EFFECT:
-                        reason = NO_EFFECT[key]
+                    reason = NO_EFFECT.get(key)
                     row = Row(self, by_key[key], reason, key in VERIFIED)
                     row.widget.vg_row = row
                     self.rows[key] = row
@@ -685,8 +703,9 @@ def run_window(arguments):
 
         def finish_self_test(self, window):
             """不需要人看的檢查：視窗建得起來、每一項設定都有一列。"""
-            expected = len(window.engine.read()[0]) if window.engine and window.rows else 0
-            print(f"視窗建立：{len(window.rows)} 列，引擎 {expected} 項，分頁 {len(window.lists)} 頁")
+            total = len(window.engine.read()[0]) if window.engine and window.rows else 0
+            expected = total - len(HIDDEN) if total else 0
+            print(f"視窗建立：{len(window.rows)} 列（引擎 {total} 項，其中 {len(HIDDEN)} 項 macOS 專用不顯示），分頁 {len(window.lists)} 頁")
             ok = expected > 0 and len(window.rows) == expected
             if ok and arguments.screenshot:
                 # 畫不出來不算失敗：有些顯示後端沒有畫面可以擷取。
