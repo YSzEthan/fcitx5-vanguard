@@ -1,19 +1,37 @@
-# 每次 push：編引擎、跑測試、做 deb，再把外掛做成 flatpak 版 Fcitx5 的擴充。
-# 產物掛在該次執行的 Artifacts：引擎 tarball、引擎原始碼、deb、fcitx5-vanguard.flatpak。
-# 只保留 3 天：私人 repo 的儲存額度有限，一次約 80MB，留預設的 90 天很快就滿。
+# 每次 push：編引擎、跑測試、做 deb、建 flatpak 擴充，確認都做得出來。平常不保留任何產物。
+# 只有推上版本 tag（v 開頭，例如 v0.1.0）時，才把產物掛到 GitHub Release。
 #
+# 為什麼平常不留：私人 repo 的 Actions 儲存額度有限，一次約 80MB，幾次就滿。
+# Release 的附件不佔那個額度。
 name: build
 
 on:
   push:
+    branches: ["**"]
+    tags: ["v*"]
   workflow_dispatch:
 
+permissions:
+  contents: write   # 建立 Release 要用
+
 jobs:
-  engine:
-    name: 引擎、測試、deb
+  build:
+    name: 建置與測試
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+
+      - name: 版本號
+        id: version
+        run: |
+          VERSION="$(sed -n 's/^project(fcitx5-vanguard VERSION \([0-9.]*\).*/\1/p' addon/CMakeLists.txt)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "原始碼裡的版本：$VERSION"
+          # tag 要跟原始碼裡的版本一致，免得發出去的檔名跟 tag 對不上。
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+            echo "::error::tag 是 $GITHUB_REF_NAME，但 addon/CMakeLists.txt 的版本是 $VERSION"
+            exit 1
+          fi
 
       - name: 安裝系統套件
         run: |
@@ -21,7 +39,8 @@ jobs:
           sudo apt-get install -y -q --no-install-recommends \
             patchelf zstd cmake ninja-build libcurl4-openssl-dev \
             fcitx5 libfcitx5core-dev libfcitx5utils-dev libfcitx5config-dev fcitx5-modules-dev \
-            dbus dbus-daemon python3-dbus python3-gi
+            dbus dbus-daemon python3-dbus python3-gi \
+            flatpak flatpak-builder
 
       - name: 安裝 Swift（版本取自 .swift-version）
         run: |
@@ -46,27 +65,55 @@ jobs:
       - name: 做 deb
         run: ./packaging/deb/build-deb.sh
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: engine
-          path: dist/fcitx5-vanguard-engine-*.tar.zst
-          if-no-files-found: error
-          retention-days: 3
+      - name: 準備 flatpak：安裝 Fcitx5 與它用的那一版 KDE SDK
+        run: |
+          # Ubuntu 24.04 預設擋掉非特權的 user namespace，flatpak-builder 的沙盒需要它。
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y --noninteractive flathub org.fcitx.Fcitx5
+          # 擴充必須跟 Fcitx5 用同一版 SDK。flathub 上的 Fcitx5 換版時這裡自動跟上，不用改 manifest。
+          SDK="$(flatpak info --user --show-sdk org.fcitx.Fcitx5)"   # 形如 org.kde.Sdk/x86_64/6.11
+          SDK_VERSION="${SDK##*/}"
+          echo "Fcitx5 的 SDK：$SDK"
+          flatpak install --user -y --noninteractive flathub "org.kde.Sdk//$SDK_VERSION"
+          MANIFEST=packaging/flatpak/org.fcitx.Fcitx5.Addon.Vanguard.yaml
+          sed -i "s|^sdk: org.kde.Sdk//.*|sdk: org.kde.Sdk//$SDK_VERSION|" "$MANIFEST"
+          # manifest 裡引擎壓縮檔的檔名帶版本號，跟著原始碼的版本走。
+          sed -i "s|fcitx5-vanguard-engine-[0-9.]*-x86_64.tar.zst|fcitx5-vanguard-engine-${{ steps.version.outputs.version }}-x86_64.tar.zst|" "$MANIFEST"
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: engine-sources
-          path: dist/fcitx5-vanguard-engine-sources-*.tar.zst
-          if-no-files-found: error
-          retention-days: 3
+      - name: 建置 flatpak 擴充
+        run: |
+          flatpak-builder --user --force-clean --repo=dist/flatpak-repo dist/flatpak-build \
+            packaging/flatpak/org.fcitx.Fcitx5.Addon.Vanguard.yaml
+          flatpak build-bundle --runtime dist/flatpak-repo \
+            "dist/fcitx5-vanguard-${{ steps.version.outputs.version }}-x86_64.flatpak" \
+            org.fcitx.Fcitx5.Addon.Vanguard stable
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: deb
-          path: dist/*.deb
-          if-no-files-found: error
-          retention-days: 3
+      - name: 裝起來檢查外掛載得到引擎
+        run: |
+          flatpak install --user -y --noninteractive dist/fcitx5-vanguard-*-x86_64.flatpak
+          flatpak run --command=sh org.fcitx.Fcitx5 -c '
+            set -e
+            ls -l /app/addons/Vanguard/lib/fcitx5/vanguard.so /app/addons/Vanguard/share/fcitx5-vanguard/
+            ! ldd /app/addons/Vanguard/lib/fcitx5/vanguard.so | grep "not found"'
 
+      - name: 列出這次做出來的東西
+        run: ls -lh dist/*.deb dist/*.flatpak dist/fcitx5-vanguard-engine-*.tar.zst
+
+      # ---- 以下只在推版本 tag 時執行 ----
+      - name: 發佈到 GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "fcitx5-vanguard ${{ steps.version.outputs.version }}" \
+            --generate-notes \
+            dist/*.deb \
+            dist/*.flatpak \
+            dist/fcitx5-vanguard-engine-*.tar.zst
+
+      # 測試失敗時留下紀錄方便查，檔案很小，一天後自動刪除。
       - name: 測試失敗時留下 fcitx5 的紀錄
         if: failure()
         uses: actions/upload-artifact@v4
@@ -75,57 +122,4 @@ jobs:
           path: |
             addon/build/sandbox/fcitx5.log
             addon/build/prefs/*.log
-          retention-days: 3
-
-  flatpak:
-    name: flatpak 擴充
-    needs: engine
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: engine
-          path: dist
-
-      - name: 安裝 flatpak-builder
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends flatpak flatpak-builder
-          # Ubuntu 24.04 預設擋掉非特權的 user namespace，flatpak-builder 的沙盒需要它。
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-
-      - name: 安裝 Fcitx5 與它用的那一版 KDE SDK
-        run: |
-          flatpak install --user -y --noninteractive flathub org.fcitx.Fcitx5
-          # 擴充必須跟 Fcitx5 用同一版 SDK。flathub 上的 Fcitx5 換版時這裡自動跟上，不用改 manifest。
-          SDK="$(flatpak info --user --show-sdk org.fcitx.Fcitx5)"   # 形如 org.kde.Sdk/x86_64/6.11
-          SDK_VERSION="${SDK##*/}"
-          echo "Fcitx5 的 SDK：$SDK"
-          flatpak install --user -y --noninteractive flathub "org.kde.Sdk//$SDK_VERSION"
-          sed -i "s|^sdk: org.kde.Sdk//.*|sdk: org.kde.Sdk//$SDK_VERSION|" \
-            packaging/flatpak/org.fcitx.Fcitx5.Addon.Vanguard.yaml
-
-      - name: 建置擴充
-        run: |
-          flatpak-builder --user --force-clean --repo=dist/flatpak-repo dist/flatpak-build \
-            packaging/flatpak/org.fcitx.Fcitx5.Addon.Vanguard.yaml
-          flatpak build-bundle --runtime dist/flatpak-repo dist/fcitx5-vanguard.flatpak \
-            org.fcitx.Fcitx5.Addon.Vanguard stable
-
-      - name: 裝起來檢查外掛載得到引擎
-        run: |
-          flatpak install --user -y --noninteractive dist/fcitx5-vanguard.flatpak
-          flatpak run --command=sh org.fcitx.Fcitx5 -c '
-            set -e
-            ls -l /app/addons/Vanguard/lib/fcitx5/vanguard.so /app/addons/Vanguard/share/fcitx5-vanguard/
-            ! ldd /app/addons/Vanguard/lib/fcitx5/vanguard.so | grep "not found"'
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: flatpak
-          path: dist/fcitx5-vanguard.flatpak
-          if-no-files-found: error
-          retention-days: 3
+          retention-days: 1

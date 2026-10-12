@@ -49,7 +49,7 @@ fcitx5 預設把左 Shift 設成全域熱鍵。切換中英請用右 Shift，或
 
 ## 安裝
 
-還沒有發佈編好的套件，要自己建置，步驟在下一節。建置完之後：
+編好的套件在這個 repo 的 Releases 頁面（如果已經發過版本）；沒有的話要自己建置，步驟在下一節。拿到檔案之後：
 
 | 環境 | 做法 |
 |---|---|
@@ -94,7 +94,7 @@ flatpak 那一種值得多說兩句。flatpak 版的 Fcitx5 在沙盒裡，看�
 
 Arch 的套件只有一半是在 Arch 上編的。C++ 的外掛本體在 Arch 編，引擎則沿用 Ubuntu 上編好的二進位檔，因為 Arch 的官方套件庫沒有 Swift。
 
-`.github/workflows/build.yml` 每次 push 都會跑一遍上面的流程，另外再建一份 flatpak 擴充。
+`.github/workflows/build.yml` 每次 push 都會跑一遍上面的流程，另外再建一份 flatpak 擴充，但不保留產物。推上版本 tag（例如 `v0.1.0`，要跟 `addon/CMakeLists.txt` 裡的版本一致）時，才會把 deb、flatpak 擴充、引擎與它的原始碼掛到 GitHub Release。Arch 的套件不在 CI 裡做。
 
 ## 專案結構
 
