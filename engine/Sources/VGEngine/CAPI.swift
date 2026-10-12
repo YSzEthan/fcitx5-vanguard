@@ -55,6 +55,16 @@ nonisolated public func vgInit(
     }
 
     SymbolMenu.install()
+    // 本專案自己的預設值：選字視窗直排、一頁 9 個，貼近 macOS 版常見的樣子。
+    // 引擎的原廠預設是橫排 6 個。只在第一次啟動時套用一次，之後使用者改了就以使用者的為準。
+    // （不能用「這個 key 有沒有值」來判斷：引擎啟動時的檢查會把選字鍵的預設值寫進去。）
+    let defaults = UserDefaults.standard
+    let markerKey = "Fcitx5VanguardDefaultsApplied"
+    if !defaults.bool(forKey: markerKey) {
+      PrefMgr.sharedSansDidSetOps.useHorizontalCandidateList = false
+      PrefMgr.sharedSansDidSetOps.candidateKeys = "123456789"
+      defaults.set(true, forKey: markerKey)
+    }
     let engine = Engine()
     engine.proxy.onCommit = { host.commit($0) }
     engine.proxy.onUpdate = { host.update() }

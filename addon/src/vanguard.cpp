@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // fcitx5-vanguard：把引擎（Swift，經 vanguard.h 的 C 介面）接到 fcitx5 的薄殼。
+#include <cstdio>
 #include <cstdlib>
 #include <memory>
 #include <string>
@@ -12,6 +13,7 @@
 #include <fcitx-utils/event.h>
 #include <fcitx-utils/log.h>
 #include <fcitx-utils/standardpath.h>
+#include <fcitx-utils/utf8.h>
 #include <fcitx/addonfactory.h>
 #include <fcitx/addonmanager.h>
 #include <fcitx/candidatelist.h>
@@ -62,6 +64,15 @@ constexpr const char *kPrefShiftRight = "TogglingAlphanumericalModeWithRShift";
 constexpr const char *kPrefShiftNotice = "ShowNotificationsWhenTogglingShift";
 
 class VanguardEngine;
+
+// 單一個字就回傳「U+6A23」這種碼位標示；多個字或空字串回傳空字串。
+std::string codePointLabel(const std::string &text) {
+    if (text.empty() || fcitx::utf8::length(text) != 1) return {};
+    const uint32_t codePoint = fcitx::utf8::getChar(text);
+    char buffer[16];
+    std::snprintf(buffer, sizeof(buffer), "U+%04X", codePoint);
+    return buffer;
+}
 
 class VanguardCandidateWord final : public fcitx::CandidateWord {
 public:
@@ -332,6 +343,15 @@ private:
             list->setLabels(labels);
             const int32_t highlighted = vg_candidate_highlighted();
             if (highlighted >= 0) list->setGlobalCursorIndex(highlighted);
+            // 頁碼與反白那個字的 Unicode 碼位，仿 macOS 版選字窗底下那一列。
+            // fcitx5 的選字視窗沒有頁碼欄位，只能放在輔助文字列。
+            std::string footer = std::to_string(vg_candidate_page_index() + 1) + "/" +
+                                 std::to_string(vg_candidate_page_count());
+            if (highlighted >= 0) {
+                const std::string codePoint = codePointLabel(takeString(vg_candidate_text(highlighted)));
+                if (!codePoint.empty()) footer += "  " + codePoint;
+            }
+            panel.setAuxDown(fcitx::Text(footer));
             panel.setCandidateList(std::move(list));
         }
 

@@ -4,6 +4,7 @@
 由 tests/run.sh 在隔離的環境裡執行，不要直接跑。
 """
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -38,6 +39,7 @@ class Client:
         self.candidates = []
         self.candidate_cursor = -1
         self.aux_up = ""
+        self.aux_down = ""
         self.has_prev = False
         self.has_next = False
         self.layout = 0
@@ -60,10 +62,11 @@ class Client:
     def on_preedit(self, segments, _cursor):
         self.preedit = "".join(str(text) for text, _flags in segments)
 
-    def on_client_side_ui(self, _preedit, _cursor, aux_up, _aux_down, candidates, cursor, _layout, has_prev, has_next):
+    def on_client_side_ui(self, _preedit, _cursor, aux_up, aux_down, candidates, cursor, _layout, has_prev, has_next):
         self.candidates = [(str(label), str(text)) for label, text in candidates]
         self.candidate_cursor = int(cursor)
         self.aux_up = "".join(str(text) for text, _flags in aux_up)
+        self.aux_down = "".join(str(text) for text, _flags in aux_down)
         self.has_prev = bool(has_prev)
         self.has_next = bool(has_next)
         self.layout = int(_layout)
@@ -317,6 +320,8 @@ def main():
         client.type("su3")
         client.key(KEY_DOWN)
         first_page = candidate_texts(client)
+        report.check("選字視窗附註是頁碼與反白字的碼位", re.fullmatch(r"1/\d+  U\+4F60", client.aux_down) is not None,
+                     repr(client.aux_down))
         report.check("第一頁：沒有上一頁、有下一頁", (client.has_prev, client.has_next) == (False, True),
                      f"has_prev={client.has_prev} has_next={client.has_next}")
         client.key(KEY_PAGE_DOWN)
@@ -352,25 +357,30 @@ def main():
         print("15. fcitx5 設定介面：讀得到目前的值，改了立刻生效")
         uri = "fcitx://config/addon/vanguard"
         values, _description = controller.GetConfig(uri)
-        report.equal("讀到的預設值", (str(values["HorizontalCandidateList"]), str(values["CandidateKeys"])), ("True", "123456"))
+        report.equal("讀到的預設值", (str(values["HorizontalCandidateList"]), str(values["CandidateKeys"])), ("False", "123456789"))
 
         def set_config(horizontal, keys):
             controller.SetConfig(uri, dbus.Dictionary(
                 {"HorizontalCandidateList": horizontal, "CandidateKeys": keys}, signature="sv", variant_level=1))
             client.settle(0.3)
 
-        set_config("False", "123456789")
         client.type("su3")
         client.key(KEY_DOWN)
-        report.equal("一頁變成 9 個", len(client.candidates), 9)
+        report.equal("預設一頁 9 個", len(client.candidates), 9)
         report.equal("第 9 個的標籤", client.candidates[8][0] if len(client.candidates) == 9 else None, "9. ")
-        report.equal("排列方向變成直排（1 直排、2 橫排）", client.layout, 1)
+        report.equal("預設直排（1 直排、2 橫排）", client.layout, 1)
         client.key(KEY_ESCAPE)
         client.key(KEY_ESCAPE)
         set_config("True", "123456")
         client.type("su3")
         client.key(KEY_DOWN)
-        report.equal("改回來：一頁 6 個、橫排", (len(client.candidates), client.layout), (6, 2))
+        report.equal("改成橫排、一頁 6 個", (len(client.candidates), client.layout), (6, 2))
+        client.key(KEY_ESCAPE)
+        client.key(KEY_ESCAPE)
+        set_config("False", "123456789")
+        client.type("su3")
+        client.key(KEY_DOWN)
+        report.equal("改回來", (len(client.candidates), client.layout), (9, 1))
         client.key(KEY_ESCAPE)
         client.key(KEY_ESCAPE)
 

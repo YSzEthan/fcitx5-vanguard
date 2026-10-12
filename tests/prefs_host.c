@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
   check_int("注音變體資料表載入（跟辭庫同目錄）", vg_bpmfvs_table_loaded(), 1);
 
   if (setting) {
-    check_str("選字鍵的預設值", vg_pref_get("CandidateKeys"), "123456");
+    check_str("選字鍵的預設值（本專案的預設，引擎原廠是 123456）", vg_pref_get("CandidateKeys"), "123456789");
     check_int("改選字鍵", vg_pref_set("CandidateKeys", "asdfgh"), 0);
     check_int("不認得的 key 被拒絕", vg_pref_set("NoSuchPreference", "1"), 1);
     check_int("型別不合被拒絕", vg_pref_set("UseSCPCTypingMode", "maybe"), 2);
