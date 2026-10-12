@@ -420,7 +420,7 @@ def main():
         report.equal("分頁表、翻譯表跟引擎的設定對得起來", code, 0)
         code, output, _error = settings("--list")
         listed = [line.split("\t") for line in output.splitlines()]
-        report.equal("列得出 93 項（引擎 119 項，扣掉不顯示的 macOS 專用 26 項）", (code, len(listed)), (0, 93))
+        report.equal("列得出 82 項（引擎 119 項，扣掉不顯示的無作用項目 37 項）", (code, len(listed)), (0, 82))
         report.check("每一項都有分頁與標題", all(len(line) == 5 and line[0] != "？" and line[4] for line in listed))
         report.equal("讀一項", settings("--get", "CandidateKeys")[:2], (0, "123456789"))
         report.equal("寫整數選項", settings("--set", "SpaceKeyBehaviorAgainstICB=0")[0], 0)
@@ -434,7 +434,7 @@ def main():
         report.check("格式不對的值被拒絕", settings("--set", "UseSCPCTypingMode=maybe")[0] != 0)
         report.check("不認得的 key 被拒絕", settings("--set", "NoSuchPreference=1")[0] != 0)
         report.equal("被拒絕後原值不變", settings("--get", "SpaceKeyBehaviorAgainstICB")[1], "1")
-        report.check("隱藏的 macOS 專用項目不在清單裡", not any(line[2] == "AppleLanguages" for line in listed))
+        report.check("隱藏的項目不在清單裡", not any(line[2] in ("AppleLanguages", "KanjiConversionPreferences") for line in listed))
         report.equal("寫字串陣列（JSON）；隱藏的項目指定 key 仍可讀寫", settings("--set", 'AppleLanguages=["zh-Hant"]')[0], 0)
         report.equal("讀回來", settings("--get", "AppleLanguages")[1], '["zh-Hant"]')
         settings("--set", "AppleLanguages=[]")
@@ -449,7 +449,7 @@ def main():
                 shots = os.environ.get("VANGUARD_TEST_SCREENSHOTS")
                 code, output, error = settings("--self-test", *(["--screenshot", shots] if shots else []), env=gui_env)
                 print("    " + output.replace("\n", "\n    "))
-                report.check("視窗建得起來，顯示的 93 項各有一列", code == 0, error[-300:])
+                report.check("視窗建得起來，顯示的 82 項各有一列", code == 0, error[-300:])
             finally:
                 broadway.terminate()
         else:

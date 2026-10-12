@@ -17,7 +17,7 @@
   fcitx5-vanguard-settings --set KEY=VALUE
   fcitx5-vanguard-settings --check      檢查分頁表與翻譯表有沒有漏掉引擎的設定
 
-引擎共 119 項設定，其中 26 項是 macOS 專用、在這裡沒有作用，不顯示（見 HIDDEN）。
+引擎共 119 項設定，其中 37 項在這個版本沒有作用（26 項 macOS 專用、11 項沒有接上），不顯示（見 HIDDEN）。
 """
 import argparse
 import json
@@ -48,7 +48,7 @@ PAGES = [
     ]),
     ("keys", "按鍵行為", "個別按鍵在組字時做什麼。", [
         "SpaceKeyBehaviorAgainstICB", "UpperCaseLetterKeyBehavior", "NumPadCharInputBehavior",
-        "SpecifyIntonationKeyBehavior", "SuppressTooltipForIntonationKeyOverrideEvents",
+        "SpecifyIntonationKeyBehavior",
         "SpecifyShiftBackSpaceKeyBehavior", "SpecifyShiftTabKeyBehavior",
         "SpecifyShiftSpaceKeyBehavior4CandidateWindow", "SpecifyShiftSpaceKeyBehavior4EmptyState",
         "SpecifyCmdOptCtrlEnterBehavior", "InlineDumpPinyinInLieuOfZhuyin", "ReflectBPMFVSInCompositionBuffer",
@@ -58,9 +58,7 @@ PAGES = [
      "fcitx5 預設把左 Shift 設成全域熱鍵（暫時切到第一個輸入法），那個設定開著時左 Shift 到不了這裡。", [
         "TogglingAlphanumericalModeWithLShift", "TogglingAlphanumericalModeWithRShift",
         "ShowNotificationsWhenTogglingShift", "ShareAlphanumericalModeStatusAcrossClients",
-        "BypassNonAppleCapsLockHandling", "ShiftEisuToggleOffTogetherWithCapsLock",
-        "ShowNotificationsWhenTogglingCapsLock", "ShowNotificationsWhenTogglingEisu",
-        "ShowModeDescriptionOnActivatingServer",
+        "BypassNonAppleCapsLockHandling",
     ]),
     ("candidates", "選字", "選字視窗的內容與選字時的行為。視窗的字型、顏色、外框由 fcitx5 的佈景決定，不在這裡。", [
         "UseHorizontalCandidateList", "CandidateKeys", "UseRearCursorMode",
@@ -69,20 +67,19 @@ PAGES = [
         "ConsolidateContextOnCandidateSelection", "PreferredRevolverForceLevel",
         "UseFixedCandidateOrderOnSelection", "enforceETenDOSCandidateSequence",
         "UseSpaceToCommitHighlightedCandidate4SCPC", "AlsoConfirmAssociatedCandidatesByEnter",
-        "ShowCodePointInCandidateUI", "ShowReverseLookupInCandidateUI",
+        "ShowCodePointInCandidateUI",
         "AllowRescoringSingleKanjiCandidates", "MaxCandidateLength", "CandidateServiceMenuContents",
     ]),
     ("output", "輸出", "送出去的字要不要再轉換。", [
-        "MostRecentInputMode", "KanjiConversionPreferences", "CNS11643Enabled",
+        "MostRecentInputMode", "CNS11643Enabled",
         "FilterNonCNSReadingsForCHTInput", "FilterFactoryKanjisOfNonCurrentInputMode",
         "HalfWidthPunctuationEnable", "CurrencyNumeralsEnabled", "SymbolInputEnabled",
-        "SuppressFactoryUnigramsOfKanaSyllables", "HardenVerticalPunctuations", "DeltaOfCalendarYears",
+        "SuppressFactoryUnigramsOfKanaSyllables", "DeltaOfCalendarYears",
     ]),
     ("lexicon", "辭典與記憶", "使用者語彙、選字記憶與相關的資料檔。", [
         "FetchSuggestionsFromPerceptionOverrideModel", "ReducePOMLifetimeToNoMoreThan12Hours",
         "AssociatedPhrasesEnabled", "PhraseReplacementEnabled", "UserPhrasesDatabaseBypassed",
-        "ReplaceSymbolMenuNodeWithUserSuppliedData", "ShouldAutoReloadUserDataFiles",
-        "UserDataFolderSpecified", "UseExternalFactoryDict",
+        "ReplaceSymbolMenuNodeWithUserSuppliedData",
     ]),
     ("cassette", "磁帶模式", "用 CIN 表格檔擴充其他輸入法（倉頡、嘸蝦米等）。", [
         "CassetteEnabled", "CassettePath", "ShowTranslatedStrokesInCompositionBuffer",
@@ -129,6 +126,23 @@ HIDDEN = [
     "PhraseEditorAutoReloadExternalModifications",
 ]
 
+# 不是 macOS 專用、但這個版本沒有接上所以改了沒有作用的設定，一樣不顯示（使用者決定，2026-10-12）。
+# 哪天接上了，就從這裡移回 PAGES。
+HIDDEN_NOT_WIRED = {
+    "KanjiConversionPreferences": "這個版本沒有接上漢字轉換器。",
+    "UserDataFolderSpecified": "這個版本的使用者資料夾位置是固定的（見本頁下方）。",
+    "ShouldAutoReloadUserDataFiles": "這個版本沒有監看檔案變動；改了語彙檔要重新啟動 fcitx5。",
+    "UseExternalFactoryDict": "這個版本的辭庫路徑由套件決定。",
+    "ShowNotificationsWhenTogglingCapsLock": "這個版本沒有接上 Caps Lock 的切換通知。",
+    "ShowNotificationsWhenTogglingEisu": "Linux 鍵盤沒有 JIS 英數鍵的對應處理。",
+    "ShiftEisuToggleOffTogetherWithCapsLock": "這個版本沒有接上 Caps Lock 的狀態控制。",
+    "ShowModeDescriptionOnActivatingServer": "提示文字的翻譯表不在 fcitx5 行程裡，顯示不出來。",
+    "SuppressTooltipForIntonationKeyOverrideEvents": "該提示在這個版本本來就顯示不出來。",
+    "ShowReverseLookupInCandidateUI": "這個版本的選字視窗沒有顯示反查結果的欄位。",
+    "HardenVerticalPunctuations": "這個版本沒有縱排輸入。",
+}
+HIDDEN += list(HIDDEN_NOT_WIRED)
+
 # 引擎沒有給標題的幾項（macOS 版把它們放在選單或別的地方），這裡自己補。
 EXTRA_TEXTS = {
     "_FailureFlag_POMObservation": ("選字記憶觀察失敗旗標", "引擎內部用：上次觀察選字記憶時當掉就會設起來，下次啟動時據此停用該功能。平常不需要動。"),
@@ -155,21 +169,6 @@ VERIFIED = {
     "TogglingAlphanumericalModeWithLShift", "TogglingAlphanumericalModeWithRShift",
     "ShowNotificationsWhenTogglingShift", "UpperCaseLetterKeyBehavior", "BypassNonAppleCapsLockHandling",
     "SpaceKeyBehaviorAgainstICB", "KeyboardParser4Zhuyin",
-}
-
-# 有顯示、但已知在這個版本沒有作用的，以及原因。
-NO_EFFECT = {
-    "KanjiConversionPreferences": "這個版本沒有接上漢字轉換器。",
-    "UserDataFolderSpecified": "這個版本的使用者資料夾位置是固定的（見本頁下方）。",
-    "ShouldAutoReloadUserDataFiles": "這個版本沒有監看檔案變動；改了語彙檔要重新啟動 fcitx5。",
-    "UseExternalFactoryDict": "這個版本的辭庫路徑由套件決定。",
-    "ShowNotificationsWhenTogglingCapsLock": "這個版本沒有接上 Caps Lock 的切換通知。",
-    "ShowNotificationsWhenTogglingEisu": "Linux 鍵盤沒有 JIS 英數鍵的對應處理。",
-    "ShiftEisuToggleOffTogetherWithCapsLock": "這個版本沒有接上 Caps Lock 的狀態控制。",
-    "ShowModeDescriptionOnActivatingServer": "提示文字的翻譯表不在 fcitx5 行程裡，顯示不出來。",
-    "SuppressTooltipForIntonationKeyOverrideEvents": "該提示在這個版本本來就顯示不出來。",
-    "ShowReverseLookupInCandidateUI": "這個版本的選字視窗沒有顯示反查結果的欄位。",
-    "HardenVerticalPunctuations": "這個版本沒有縱排輸入。",
 }
 
 PRODUCT_NAME_PATTERN = re.compile("唯音輸入法|唯音")
@@ -314,9 +313,7 @@ def page_of():
     return {key: page_id for page_id, _title, _intro, keys in PAGES for key in keys}
 
 
-def status_of(key, pages):
-    if key in NO_EFFECT:
-        return "無作用"
+def status_of(key):
     return "已驗證" if key in VERIFIED else "未驗證"
 
 
@@ -336,7 +333,7 @@ def command_check(items, texts):
         for option in item.get("options", []):
             if str(option["label"]).startswith("i18n:") and texts.lookup(option["label"]) is None:
                 problems.append(f"選項沒有翻譯：{item['key']} = {option['value']}")
-    print(f"引擎的設定 {len(engine_keys)} 項：顯示 {len(listed) - len(HIDDEN)} 項、隱藏（macOS 專用）{len(HIDDEN)} 項；"
+    print(f"引擎的設定 {len(engine_keys)} 項：顯示 {len(listed) - len(HIDDEN)} 項、隱藏（這個版本無作用）{len(HIDDEN)} 項；"
           f"翻譯表 {len(texts.table)} 條")
     for problem in problems:
         print("  " + problem)
@@ -358,7 +355,7 @@ def run_command_line(arguments):
             if item["key"] in HIDDEN:
                 continue
             page = titles.get(pages.get(item["key"]), "？")
-            print(f"{page}\t{status_of(item['key'], pages)}\t{item['key']}\t{to_text(item['type'], item['value'])}\t{texts.title(item)}")
+            print(f"{page}\t{status_of(item['key'])}\t{item['key']}\t{to_text(item['type'], item['value'])}\t{texts.title(item)}")
         return 0
     if arguments.get:
         if arguments.get not in by_key:
@@ -390,7 +387,6 @@ STYLE = """
 .vg-key { font-size: 0.78em; opacity: 0.45; font-family: monospace; }
 .vg-badge { font-size: 0.78em; padding: 1px 7px; border-radius: 9px; }
 .vg-badge-ok { background: alpha(@theme_selected_bg_color, 0.22); }
-.vg-badge-off { background: alpha(#c0392b, 0.20); }
 .vg-banner { padding: 10px 14px; background: alpha(#c0392b, 0.18); }
 .vg-intro { opacity: 0.8; }
 .vg-status { padding: 4px 12px; font-size: 0.88em; opacity: 0.75; }
@@ -407,7 +403,7 @@ def run_window(arguments):
     class Row:
         """一項設定在畫面上的一列，以及它的控制元件。"""
 
-        def __init__(self, window, item, no_effect_reason, verified):
+        def __init__(self, window, item, verified):
             self.window = window
             self.item = item
             self.key = item["key"]
@@ -425,14 +421,10 @@ def run_window(arguments):
             title = Gtk.Label(label=texts.title(item), xalign=0, wrap=True)
             title.add_css_class("vg-title")
             heading.append(title)
-            if no_effect_reason is not None:
-                heading.append(self.badge(Gtk, "這個版本無作用", "vg-badge-off"))
-            elif verified:
+            if verified:
                 heading.append(self.badge(Gtk, "已驗證", "vg-badge-ok"))
             left.append(heading)
             description = texts.description(item)
-            if no_effect_reason:
-                description = (description + "\n" if description else "") + "⚠ " + no_effect_reason
             if description:
                 label = Gtk.Label(label=description, xalign=0, wrap=True, selectable=False)
                 label.add_css_class("vg-description")
@@ -635,8 +627,7 @@ def run_window(arguments):
                 listbox.add_css_class("frame")
                 listbox.set_filter_func(self.filter_row)
                 for key in keys:
-                    reason = NO_EFFECT.get(key)
-                    row = Row(self, by_key[key], reason, key in VERIFIED)
+                    row = Row(self, by_key[key], key in VERIFIED)
                     row.widget.vg_row = row
                     self.rows[key] = row
                     listbox.append(row.widget)
@@ -705,7 +696,7 @@ def run_window(arguments):
             """不需要人看的檢查：視窗建得起來、每一項設定都有一列。"""
             total = len(window.engine.read()[0]) if window.engine and window.rows else 0
             expected = total - len(HIDDEN) if total else 0
-            print(f"視窗建立：{len(window.rows)} 列（引擎 {total} 項，其中 {len(HIDDEN)} 項 macOS 專用不顯示），分頁 {len(window.lists)} 頁")
+            print(f"視窗建立：{len(window.rows)} 列（引擎 {total} 項，其中 {len(HIDDEN)} 項無作用不顯示），分頁 {len(window.lists)} 頁")
             ok = expected > 0 and len(window.rows) == expected
             if ok and arguments.screenshot:
                 # 畫不出來不算失敗：有些顯示後端沒有畫面可以擷取。
